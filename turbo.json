@@ -6,6 +6,9 @@
     "lint": {},
     "typecheck": {
       "outputs": []
+    },
+    "test": {
+      "outputs": []
     }
   }
 }

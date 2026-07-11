@@ -1,0 +1,395 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ExternalIdentityProvider {
+  MICROSOFT_ENTRA_ID
+  GOOGLE
+  LOCAL
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum OrganizationMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  LEAD
+}
+
+enum CustomerContactRole {
+  PRIMARY
+  BILLING
+  TECHNICAL
+  OTHER
+}
+
+enum AddressType {
+  PRIMARY
+  BILLING
+  SHIPPING
+  PROJECT_SITE
+  OTHER
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectMemberRole {
+  OWNER
+  MANAGER
+  CONTRIBUTOR
+  VIEWER
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum ActivityType {
+  PROJECT_CREATED
+  STATUS_CHANGED
+  TASK_CREATED
+  TASK_UPDATED
+  NOTE_ADDED
+  MEMBER_ADDED
+}
+
+model Organization {
+  id         String               @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String               @unique
+  status     OrganizationStatus   @default(ACTIVE)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  archivedAt DateTime?
+  members    OrganizationMember[]
+  customers  Customer[]
+  contacts   Contact[]
+  addresses  Address[]
+  projects   Project[]
+
+  @@map("organizations")
+}
+
+model User {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  email              String                 @unique
+  displayName        String
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  archivedAt         DateTime?
+  externalIdentities ExternalIdentity[]
+  organizationRoles  OrganizationMember[]
+  projectMemberships ProjectMember[]
+  taskAssignments    TaskAssignment[]
+  notesAuthored      Note[]
+  activitiesLogged   Activity[]             @relation("ActivityActor")
+  statusChanges      ProjectStatusHistory[]
+
+  @@map("users")
+}
+
+model ExternalIdentity {
+  id         String                   @id @default(uuid()) @db.Uuid
+  userId     String                   @db.Uuid
+  provider   ExternalIdentityProvider
+  externalId String
+  createdAt  DateTime                 @default(now())
+  user       User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalId])
+  @@unique([userId, provider])
+  @@map("external_identities")
+}
+
+model OrganizationMember {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  userId         String                 @db.Uuid
+  role           OrganizationMemberRole
+  joinedAt       DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@map("organization_members")
+}
+
+model Customer {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  name           String
+  status         CustomerStatus    @default(ACTIVE)
+  description    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  archivedAt     DateTime?
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  contacts       CustomerContact[]
+  addresses      CustomerAddress[]
+  projectLinks   ProjectCustomer[]
+
+  @@index([organizationId, name])
+  @@index([organizationId, archivedAt])
+  @@map("customers")
+}
+
+model Contact {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  fullName       String
+  email          String?
+  phone          String?
+  jobTitle       String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  archivedAt     DateTime?
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customers      CustomerContact[]
+  projectLinks   ProjectContact[]
+
+  @@index([organizationId, fullName])
+  @@index([organizationId, archivedAt])
+  @@map("contacts")
+}
+
+model Address {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  label          String?
+  street         String?
+  postalCode     String?
+  city           String?
+  country        String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  archivedAt     DateTime?
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customers      CustomerAddress[]
+  projects       ProjectAddress[]
+
+  @@index([organizationId, city])
+  @@index([organizationId, archivedAt])
+  @@map("addresses")
+}
+
+model CustomerContact {
+  id         String              @id @default(uuid()) @db.Uuid
+  customerId String              @db.Uuid
+  contactId  String              @db.Uuid
+  role       CustomerContactRole @default(PRIMARY)
+  isPrimary  Boolean             @default(false)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  customer   Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  contact    Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, contactId])
+  @@map("customer_contacts")
+}
+
+model CustomerAddress {
+  id         String      @id @default(uuid()) @db.Uuid
+  customerId String      @db.Uuid
+  addressId  String      @db.Uuid
+  type       AddressType @default(PRIMARY)
+  isPrimary  Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  address    Address     @relation(fields: [addressId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, addressId])
+  @@map("customer_addresses")
+}
+
+model Project {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  name           String
+  status         ProjectStatus          @default(PLANNED)
+  description    String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  archivedAt     DateTime?
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customers      ProjectCustomer[]
+  members        ProjectMember[]
+  contacts       ProjectContact[]
+  addresses      ProjectAddress[]
+  tasks          Task[]
+  notes          Note[]
+  activities     Activity[]
+  statusHistory  ProjectStatusHistory[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, archivedAt])
+  @@map("projects")
+}
+
+model ProjectCustomer {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @db.Uuid
+  customerId String   @db.Uuid
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, customerId])
+  @@map("project_customers")
+}
+
+model ProjectMember {
+  id        String            @id @default(uuid()) @db.Uuid
+  projectId String            @db.Uuid
+  userId    String            @db.Uuid
+  role      ProjectMemberRole @default(CONTRIBUTOR)
+  joinedAt  DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model ProjectContact {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  contactId String   @db.Uuid
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, contactId])
+  @@map("project_contacts")
+}
+
+model ProjectAddress {
+  id        String      @id @default(uuid()) @db.Uuid
+  projectId String      @db.Uuid
+  addressId String      @db.Uuid
+  type      AddressType @default(PROJECT_SITE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  address   Address     @relation(fields: [addressId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, addressId])
+  @@map("project_addresses")
+}
+
+model Task {
+  id          String           @id @default(uuid()) @db.Uuid
+  projectId   String           @db.Uuid
+  title       String
+  description String?
+  status      TaskStatus       @default(OPEN)
+  dueAt       DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  archivedAt  DateTime?
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  assignments TaskAssignment[]
+  notes       Note[]
+  activities  Activity[]
+
+  @@index([projectId, status])
+  @@index([projectId, archivedAt])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  taskId     String   @db.Uuid
+  userId     String   @db.Uuid
+  assignedAt DateTime @default(now())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([taskId, userId])
+  @@map("task_assignments")
+}
+
+model Note {
+  id         String    @id @default(uuid()) @db.Uuid
+  projectId  String    @db.Uuid
+  taskId     String?   @db.Uuid
+  authorId   String    @db.Uuid
+  content    String
+  createdAt  DateTime  @default(now())
+  archivedAt DateTime?
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  task       Task?     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  author     User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([taskId])
+  @@index([projectId, archivedAt])
+  @@map("notes")
+}
+
+model Activity {
+  id          String       @id @default(uuid()) @db.Uuid
+  projectId   String       @db.Uuid
+  taskId      String?      @db.Uuid
+  actorUserId String?      @db.Uuid
+  type        ActivityType
+  message     String
+  occurredAt  DateTime     @default(now())
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  task        Task?        @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  actor       User?        @relation("ActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, occurredAt])
+  @@index([taskId])
+  @@map("activities")
+}
+
+model ProjectStatusHistory {
+  id          String         @id @default(uuid()) @db.Uuid
+  projectId   String         @db.Uuid
+  changedById String?        @db.Uuid
+  fromStatus  ProjectStatus?
+  toStatus    ProjectStatus
+  changedAt   DateTime       @default(now())
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  changedBy   User?          @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, changedAt])
+  @@map("project_status_history")
+}
