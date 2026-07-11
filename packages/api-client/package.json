@@ -1,0 +1,12 @@
+{
+  "name": "@bissinger-os/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@bissinger-os/api-contracts": "workspace:*"
+  }
+}
