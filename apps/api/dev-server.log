@@ -1,0 +1,55 @@
+$ nest start --watch
+[2J[3J[H[[90m20:10:10[0m] Starting compilation in watch mode...
+
+[[90m20:10:19[0m] Found 0 errors. Watching for file changes.
+
+file:///C:/Users/Lorin/Desktop/Bissinger-OS/crm-system/apps/api/dist/generated/prisma/client.js:38
+Object.defineProperty(exports, "__esModule", { value: true });
+                      ^
+
+ReferenceError: exports is not defined in ES module scope
+    at file:///C:/Users/Lorin/Desktop/Bissinger-OS/crm-system/apps/api/dist/generated/prisma/client.js:38:23
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:534:37)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:388:47)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1621:24)
+    at Module._compile (node:internal/modules/cjs/loader:1786:5)
+    at Object..js (node:internal/modules/cjs/loader:1936:10)
+    at Module.load (node:internal/modules/cjs/loader:1525:32)
+    at Module._load (node:internal/modules/cjs/loader:1327:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+
+Node.js v24.13.1
+[2J[3J[H[[90m20:13:18[0m] File change detected. Starting incremental compilation...
+
+[[90m20:13:22[0m] Found 0 errors. Watching for file changes.
+
+[32m[Nest] 24552  - [39m13.07.2026, 20:13:25 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 24552  - [39m13.07.2026, 20:13:25 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +33ms[39m
+[32m[Nest] 24552  - [39m13.07.2026, 20:13:25 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPrismaModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 24552  - [39m13.07.2026, 20:13:25 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHealthModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 24552  - [39m13.07.2026, 20:13:25 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mHealthController {/api/v1/health}:[39m[38;5;3m +6ms[39m
+[32m[Nest] 24552  - [39m13.07.2026, 20:13:25 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/health, GET} route[39m[38;5;3m +5ms[39m
+[32m[Nest] 24552  - [39m13.07.2026, 20:13:25 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +182ms[39m
+[31m[Nest] 24552  - [39m13.07.2026, 20:13:25 [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::4000[39m[38;5;3m +4ms[39m
+node:net:1940
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::4000
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at ExpressAdapter.listen (C:\Users\Lorin\Desktop\Bissinger-OS\crm-system\node_modules\.pnpm\@nestjs+platform-express@11_c5451c1302db08ac0187d96647895b2b\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\Lorin\Desktop\Bissinger-OS\crm-system\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_154d0e7219cbe1cb668b4eec23e98a99\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\Lorin\Desktop\Bissinger-OS\crm-system\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_154d0e7219cbe1cb668b4eec23e98a99\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\Lorin\Desktop\Bissinger-OS\crm-system\apps\api\src\main.ts:7:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 4000
+}
+
+Node.js v24.13.1
