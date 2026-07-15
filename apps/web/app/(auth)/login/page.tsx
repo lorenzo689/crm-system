@@ -1,6 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
-
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
@@ -27,16 +25,11 @@ export default function LoginPage() {
           <section className="flex h-full min-h-0 flex-col justify-between rounded-[1.5rem] px-4 py-4 sm:px-8 sm:py-5">
             <BrandMark />
 
-            <div className="mx-auto flex w-full max-w-[430px] flex-1 flex-col justify-center py-6">
+            <div className="mx-auto flex w-full max-w-[470px] flex-1 flex-col justify-center py-6">
               <div className="space-y-3 text-center">
                 <h1 className="text-4xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-[3.25rem]">
                   Willkommen zurück
                 </h1>
-                <p className="text-sm leading-7 text-slate-500 sm:text-base">
-                  Anmelden bei Bissinger OS. Melden Sie sich mit Ihrem
-                  Bissinger-Lights-Konto an, um auf Ihre Projekte und
-                  Unternehmensdaten zuzugreifen.
-                </p>
               </div>
 
               <form className="mt-10 space-y-5">
@@ -50,7 +43,7 @@ export default function LoginPage() {
                   <input
                     id="email"
                     type="email"
-                    defaultValue="name@bissinger-lights.de"
+                    placeholder="name@bissinger-lights.de"
                     className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-[0_4px_12px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#4254ff] focus:ring-4 focus:ring-[#4254ff]/10"
                   />
                 </div>
@@ -66,7 +59,7 @@ export default function LoginPage() {
                     <input
                       id="password"
                       type="password"
-                      defaultValue="bissinger-os"
+                      placeholder="Passwort eingeben"
                       className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 pr-12 text-base text-slate-900 shadow-[0_4px_12px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#4254ff] focus:ring-4 focus:ring-[#4254ff]/10"
                     />
                     <span className="pointer-events-none absolute inset-y-0 right-4 grid place-items-center text-slate-400">
@@ -88,78 +81,41 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <label className="flex items-center gap-2 text-slate-500">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-[#4254ff] focus:ring-[#4254ff]"
-                    />
-                    Angemeldet bleiben
-                  </label>
-                  <Link
-                    href="/account-disabled"
-                    className="font-medium text-[#4254ff] transition hover:text-[#2f46ff]"
-                  >
-                    Zugang prüfen
-                  </Link>
-                </div>
-
                 <button
                   type="button"
-                  className="inline-flex h-13 w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2f46ff,#5748ff)] text-base font-semibold text-white shadow-[0_16px_32px_rgba(67,84,255,0.28)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_38px_rgba(67,84,255,0.35)]"
+                  className="inline-flex h-13 w-full items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#2f46ff,#5748ff)] text-base font-semibold text-white shadow-[0_16px_32px_rgba(67,84,255,0.28)] transition-colors duration-200 hover:border-[#4a4cff] hover:bg-white hover:bg-none hover:text-[#4a4cff] hover:shadow-[0_16px_32px_rgba(67,84,255,0.18)]"
                 >
                   Mit Microsoft anmelden
                 </button>
+
+                <p className="text-center text-sm leading-6 text-slate-500">
+                  Noch kein Zugang? Bitte an den Administrator wenden.
+                </p>
               </form>
-
-              <div className="mt-6 flex items-center gap-4 text-sm text-slate-400">
-                <span className="h-px flex-1 bg-slate-200" />
-                <span>Interner Zugriff</span>
-                <span className="h-px flex-1 bg-slate-200" />
-              </div>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <Link
-                  href="/auth/callback"
-                  className="inline-flex h-13 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Auth Callback
-                </Link>
-                <Link
-                  href="/access-denied"
-                  className="inline-flex h-13 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Access denied
-                </Link>
-              </div>
-
-              <p className="mt-6 text-center text-sm text-slate-500">
-                Kein Zugang?{' '}
-                <span className="font-semibold text-[#4254ff]">
-                  Administrator kontaktieren.
-                </span>
-              </p>
             </div>
 
-            <div className="flex flex-col gap-3 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-end justify-between pt-6 text-sm text-slate-400">
               <p>Copyright © 2026 Bissinger Lights</p>
-              <Link href="/" className="transition hover:text-slate-600">
-                Plattforminfo
-              </Link>
+              <p>Interner Zugriff</p>
             </div>
           </section>
 
-          <aside className="relative hidden h-full min-h-0 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(180deg,#413bff_0%,#3a33e7_50%,#3027d9_100%)] p-8 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] lg:flex lg:flex-col lg:justify-between xl:p-10">
+          <aside className="relative hidden h-full min-h-0 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(180deg,#413bff_0%,#3a33e7_50%,#3027d9_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] lg:flex lg:flex-col lg:justify-between">
+            <Image
+              src="/images/background.jpg"
+              alt="Bissinger Lights Projektansicht"
+              fill
+              priority
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,12,24,0.66)_0%,rgba(8,12,24,0.52)_32%,rgba(8,12,24,0.6)_100%)]" />
             <div className="pointer-events-none absolute inset-0">
               <div className="absolute left-[-8%] top-[-10%] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
               <div className="absolute right-[-12%] top-[8%] h-96 w-96 rounded-full border border-white/8 bg-white/5" />
               <div className="absolute bottom-[-18%] left-[18%] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
-              <div className="absolute inset-x-0 top-[24%] h-px bg-white/8" />
-              <div className="absolute bottom-[46%] left-0 right-0 h-px bg-white/8" />
-              <div className="absolute bottom-0 top-0 left-[48%] w-px bg-white/8" />
             </div>
 
-            <div className="relative z-10 max-w-xl pt-4">
+            <div className="relative z-10 max-w-xl px-8 pt-8 xl:px-10 xl:pt-10">
               <h2 className="text-4xl font-semibold leading-tight tracking-[-0.05em] xl:text-[3.35rem]">
                 IHR BUSINESS.
                 <br />
@@ -173,32 +129,7 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <div className="relative z-10 mt-8">
-              <div className="relative mx-auto max-w-[720px] rounded-[2rem] border border-white/10 bg-white/95 p-3 shadow-[0_28px_60px_rgba(15,23,42,0.24)]">
-                <Image
-                  src="/images/background.jpg"
-                  alt="Bissinger Lights Projektansicht"
-                  width={1400}
-                  height={960}
-                  priority
-                  className="h-[340px] w-full rounded-[1.35rem] object-cover xl:h-[390px]"
-                />
-
-                <div className="absolute left-5 top-5 rounded-2xl bg-[#4b42ff] px-4 py-3 text-white shadow-[0_12px_24px_rgba(75,66,255,0.28)]">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/72">
-                    Projektstatus
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold">Aktiv</p>
-                </div>
-
-                <div className="absolute bottom-5 right-5 rounded-2xl bg-white px-4 py-3 text-slate-900 shadow-[0_16px_32px_rgba(15,23,42,0.14)]">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                    Organisation
-                  </p>
-                  <p className="mt-2 text-lg font-semibold">Bissinger Lights</p>
-                </div>
-              </div>
-            </div>
+            <div className="relative z-10 flex-1" />
           </aside>
       </div>
     </main>
