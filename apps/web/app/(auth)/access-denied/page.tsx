@@ -1,36 +1,110 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import { AuthShell } from '../_components/auth-shell';
+
+function BrandMark() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[linear-gradient(135deg,#2f46ff,#5d6bff)] shadow-[0_10px_25px_rgba(47,70,255,0.28)]">
+        <div className="grid h-5 w-5 grid-cols-2 gap-0.5">
+          <span className="rounded-sm bg-white" />
+          <span className="rounded-sm bg-white/80" />
+          <span className="rounded-sm bg-white/80" />
+          <span className="rounded-sm bg-white" />
+        </div>
+      </div>
+      <div>
+        <p className="text-lg font-semibold text-slate-900">Bissinger OS</p>
+        <p className="text-sm text-slate-500">Interner Zugriff</p>
+      </div>
+    </div>
+  );
+}
 
 export default function AccessDeniedPage() {
   return (
-    <AuthShell
-      eyebrow="Zugriff"
-      title="Zugriff verweigert"
-      description="Ihr Microsoft-Konto wurde erfolgreich erkannt, ist fuer Bissinger OS jedoch aktuell nicht freigeschaltet."
-    >
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] p-5">
-          <p className="text-sm leading-6 text-[var(--color-muted)]">
-            Bitte wenden Sie sich an die interne Administration, wenn Sie
-            Zugriff auf Projekte, Kunden oder Unternehmensdaten benoetigen.
-          </p>
-        </div>
+    <main className="h-screen w-full overflow-hidden bg-[linear-gradient(180deg,#edf1f7_0%,#dfe6f2_100%)]">
+      <div className="grid h-screen w-full overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(246,248,252,0.92))] p-3 md:p-4 lg:grid-cols-[1.02fr_1fr]">
+        <section className="flex h-full min-h-0 flex-col justify-between rounded-[1.5rem] px-4 py-4 sm:px-8 sm:py-5">
+          <BrandMark />
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link
-            href="/login"
-            className="inline-flex justify-center rounded-full bg-[var(--color-ink)] px-5 py-3 text-sm font-semibold text-[var(--color-paper)] transition hover:bg-[var(--color-ink-soft)]"
-          >
-            Erneut anmelden
-          </Link>
-          <Link
-            href="/account-disabled"
-            className="inline-flex justify-center rounded-full border border-[var(--color-line)] px-5 py-3 text-sm font-semibold text-[var(--color-ink)] transition hover:bg-[var(--color-paper-strong)]"
-          >
-            Kontostatus ansehen
-          </Link>
-        </div>
+          <div className="mx-auto flex w-full max-w-[470px] flex-1 flex-col justify-center py-6">
+            <div className="space-y-4 text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#4a4cff]">
+                Zugriff
+              </p>
+              <h1 className="text-4xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-[3.25rem]">
+                Zugriff verweigert
+              </h1>
+              <p className="text-sm leading-7 text-slate-500 sm:text-base">
+                Ihr Konto wurde erkannt, ist für Bissinger OS aktuell jedoch
+                nicht freigeschaltet. Bitte wenden Sie sich an Ihre
+                Administration.
+              </p>
+            </div>
+
+            <div className="mt-10 space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                <p className="text-sm font-medium text-slate-900">
+                  Mögliche Gründe
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Ihr Benutzerkonto ist noch nicht freigegeben oder Ihrer
+                  Organisation wurde noch kein aktiver Zugriff zugewiesen.
+                </p>
+              </div>
+
+              <Link
+                href="/login"
+                className="inline-flex h-13 w-full items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#2f46ff,#5748ff)] text-base font-semibold text-white shadow-[0_16px_32px_rgba(67,84,255,0.28)] transition-colors duration-200 hover:border-[#4a4cff] hover:bg-white hover:bg-none hover:text-[#4a4cff] hover:shadow-[0_16px_32px_rgba(67,84,255,0.18)]"
+              >
+                Zurück zum Login
+              </Link>
+
+              <p className="text-center text-sm leading-6 text-slate-500">
+                Kein Zugang vorhanden? Bitte an den Administrator wenden.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-end justify-between pt-6 text-sm text-slate-400">
+            <p>Copyright © 2026 Bissinger Lights</p>
+            <p>Interner Zugriff</p>
+          </div>
+        </section>
+
+        <aside className="relative hidden h-full min-h-0 overflow-hidden rounded-[1.6rem] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] lg:flex lg:flex-col lg:justify-between">
+          <Image
+            src="/images/background.jpg"
+            alt="Bissinger Lights Projektansicht"
+            fill
+            priority
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,12,24,0.66)_0%,rgba(8,12,24,0.52)_32%,rgba(8,12,24,0.6)_100%)]" />
+
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-[-8%] top-[-10%] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
+            <div className="absolute right-[-12%] top-[8%] h-96 w-96 rounded-full border border-white/8 bg-white/5" />
+            <div className="absolute bottom-[-18%] left-[18%] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
+          </div>
+
+          <div className="relative z-10 max-w-xl px-8 pt-8 xl:px-10 xl:pt-10">
+            <h2 className="text-4xl font-semibold leading-tight tracking-[-0.05em] xl:text-[3.35rem]">
+              IHR BUSINESS.
+              <br />
+              IHRE PROJEKTE.
+              <br />
+              ALLES IM BLICK.
+            </h2>
+            <p className="mt-5 max-w-lg text-sm leading-7 text-white/72 sm:text-base">
+              Die zentrale Plattform für Kunden, Projekte, Angebote,
+              Kommunikation und Aufgaben.
+            </p>
+          </div>
+
+          <div className="relative z-10 flex-1" />
+        </aside>
       </div>
-    </AuthShell>
+    </main>
   );
 }
