@@ -23,7 +23,7 @@ export function DashboardSidebar({
   return (
     <aside
       className={cn(
-        "relative flex h-full shrink-0 flex-col overflow-hidden bg-[#1d1d1f] pt-8 transition-all duration-300 ease-in-out",
+        "relative flex h-full shrink-0 flex-col overflow-hidden bg-[#1d1d1f] px-4 pt-6 transition-all duration-300 ease-in-out",
         isOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_CLOSED_WIDTH,
       )}
     >
@@ -31,7 +31,10 @@ export function DashboardSidebar({
         type="button"
         aria-label={isOpen ? "Sidebar schließen" : "Sidebar öffnen"}
         onClick={onToggleSidebar}
-        className="absolute right-4 top-9 z-20 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 border-zinc-50 bg-zinc-50 text-xl text-zinc-900 transition-transform duration-300 ease-in-out"
+        className={cn(
+          "absolute z-20 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 border-zinc-50 bg-zinc-50 text-xl text-zinc-900 transition-all duration-300 ease-in-out",
+          isOpen ? "right-4 top-9" : "left-1/2 top-5 -translate-x-1/2",
+        )}
       >
         {isOpen ? (
           <TbLayoutSidebarLeftCollapse />
@@ -40,7 +43,12 @@ export function DashboardSidebar({
         )}
       </button>
 
-      <div className="flex items-center gap-x-4">
+      <div
+        className={cn(
+          "flex min-h-[72px] items-center gap-x-4",
+          isOpen ? "pr-12" : "justify-center pt-12",
+        )}
+      >
         <Image
           src="https://cdn.pixabay.com/photo/2017/02/18/19/20/logo-2078018_640.png"
           alt="Logo"
@@ -62,7 +70,10 @@ export function DashboardSidebar({
         </h1>
       </div>
 
-      <nav aria-label="Dashboard-Navigation" className="mt-6 min-h-0 flex-1">
+      <nav
+        aria-label="Dashboard-Navigation"
+        className={cn("min-h-0 flex-1", isOpen ? "mt-6" : "mt-8")}
+      >
         <ul className="space-y-0.5">
           {menuItems.map((item, index) => (
             <SidebarMenuItem
@@ -75,7 +86,12 @@ export function DashboardSidebar({
         </ul>
       </nav>
 
-      <div className="mt-auto flex shrink-0 items-center pt-6">
+      <div
+        className={cn(
+          "mt-auto flex shrink-0 items-center pt-6",
+          !isOpen && "justify-center",
+        )}
+      >
         <Image
           src="https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png"
           alt="Anonymes Profilbild"
@@ -123,7 +139,10 @@ function SidebarMenuItem({
     >
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center justify-start gap-x-4 text-left"
+        className={cn(
+          "flex w-full cursor-pointer items-center text-left",
+          isSidebarOpen ? "justify-start gap-x-4" : "justify-center",
+        )}
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 text-lg text-zinc-200 transition-colors duration-300 ease-in-out group-hover:text-[#1d1d1f]">
