@@ -1,287 +1,319 @@
-import Link from 'next/link';
+"use client";
 
-const navigationItems = [
-  { label: 'Dashboard', active: true },
-  { label: 'Projekte', active: false },
-  { label: 'Kunden', active: false },
-  { label: 'Aufgaben', active: false },
-  { label: 'Kommunikation', active: false },
-  { label: 'Organisation', active: false },
-];
+import Image from "next/image";
+import { useState, type ReactNode } from "react";
 
-const metricCards = [
-  {
-    label: 'Aktive Projekte',
-    value: '12',
-    detail: '+2 seit letzter Woche',
-  },
-  {
-    label: 'Offene Aufgaben',
-    value: '37',
-    detail: '9 mit hoher Prioritaet',
-  },
-  {
-    label: 'Kundenkontakte',
-    value: '184',
-    detail: '14 neue Eintraege',
-  },
-  {
-    label: 'Angebote in Arbeit',
-    value: '8',
-    detail: '3 zur Freigabe',
-  },
-];
+import { BiChat } from "react-icons/bi";
+import { FaBell, FaSearch } from "react-icons/fa";
+import { FaChevronDown, FaChevronRight, FaGears } from "react-icons/fa6";
+import { FiTable } from "react-icons/fi";
+import { GoGraph } from "react-icons/go";
+import { MdOutlineHeadsetMic, MdSpaceDashboard } from "react-icons/md";
+import {
+  TbLayoutSidebarLeftCollapse,
+  TbLayoutSidebarLeftExpand,
+} from "react-icons/tb";
+import { TiCalendar } from "react-icons/ti";
 
-const projectRows = [
-  {
-    name: 'Stadthalle Mannheim',
-    stage: 'Umsetzung',
-    owner: 'Max Mustermann',
-    due: '22. Juli',
-    status: 'On Track',
-  },
-  {
-    name: 'Opernhaus Frankfurt',
-    stage: 'Planung',
-    owner: 'Anna Becker',
-    due: '25. Juli',
-    status: 'Pruefung',
-  },
-  {
-    name: 'Congress Center Berlin',
-    stage: 'Angebot',
-    owner: 'Luca Weber',
-    due: '29. Juli',
-    status: 'Freigabe',
-  },
-];
+type SubMenuKey = "inbox" | "settings";
 
-const taskItems = [
-  'Freigabe fuer Projektbudget abstimmen',
-  'Rueckfrage zur Lichtsteuerung beantworten',
-  'Angebotsunterlagen fuer Neuauftrag finalisieren',
-  'Interne Abstimmung mit Vertrieb vorbereiten',
-];
+type MenuItem = {
+  title: string;
+  icon: ReactNode;
+  gap?: boolean;
+  submenuKey?: SubMenuKey;
+  subMenuItems?: string[];
+};
 
-const timelineItems = [
+const menuItems: MenuItem[] = [
   {
-    title: 'Projektstatus aktualisiert',
-    text: 'Stadthalle Mannheim wurde auf Umsetzung gesetzt.',
-    time: 'Vor 18 Min.',
+    title: "Dashboard",
+    icon: <MdSpaceDashboard />,
   },
   {
-    title: 'Neuer Kontakt angelegt',
-    text: 'Sabine Krauss wurde dem Kundenprofil hinzugefuegt.',
-    time: 'Vor 42 Min.',
+    title: "Inbox",
+    icon: <BiChat />,
+    gap: true,
+    submenuKey: "inbox",
+    subMenuItems: ["Requested Messages", "Unread Messages", "All Messages"],
   },
   {
-    title: 'Angebot freigegeben',
-    text: 'Opernhaus Frankfurt steht zur finalen Uebermittlung bereit.',
-    time: 'Heute, 09:12',
+    title: "Calendar",
+    icon: <TiCalendar />,
+  },
+  {
+    title: "Tables",
+    icon: <FiTable />,
+  },
+  {
+    title: "Analytics",
+    icon: <GoGraph />,
+  },
+  {
+    title: "Support",
+    icon: <MdOutlineHeadsetMic />,
+  },
+  {
+    title: "Settings",
+    icon: <FaGears />,
+    submenuKey: "settings",
+    subMenuItems: ["General", "Security", "Notifications"],
   },
 ];
 
-function BrandMark() {
+const SIDEBAR_OPEN_WIDTH = "w-72 p-5";
+const SIDEBAR_CLOSED_WIDTH = "w-20 p-4";
+
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+type SidebarProps = {
+  isOpen: boolean;
+  subMenus: Record<SubMenuKey, boolean>;
+  onToggleSidebar: () => void;
+  onToggleSubmenu: (menu: SubMenuKey) => void;
+};
+
+function Sidebar({
+  isOpen,
+  subMenus,
+  onToggleSidebar,
+  onToggleSubmenu,
+}: SidebarProps) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[linear-gradient(135deg,#2f46ff,#5d6bff)] shadow-[0_10px_25px_rgba(47,70,255,0.22)]">
-        <div className="grid h-5 w-5 grid-cols-2 gap-0.5">
-          <span className="rounded-sm bg-white" />
-          <span className="rounded-sm bg-white/80" />
-          <span className="rounded-sm bg-white/80" />
-          <span className="rounded-sm bg-white" />
-        </div>
+    <aside
+      className={cn(
+        "relative h-full shrink-0 overflow-hidden bg-zinc-900 pt-8 transition-all duration-300 ease-in-out",
+        isOpen ? SIDEBAR_OPEN_WIDTH : SIDEBAR_CLOSED_WIDTH,
+      )}
+    >
+      <button
+        type="button"
+        aria-label={isOpen ? "Sidebar schliessen" : "Sidebar oeffnen"}
+        onClick={onToggleSidebar}
+        className="absolute -right-4 top-9 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 border-zinc-50 bg-zinc-50 text-xl text-zinc-900 transition-transform duration-300 ease-in-out"
+      >
+        {isOpen ? (
+          <TbLayoutSidebarLeftCollapse />
+        ) : (
+          <TbLayoutSidebarLeftExpand />
+        )}
+      </button>
+
+      <div className="flex items-center gap-x-4">
+        <Image
+          src="https://cdn.pixabay.com/photo/2017/02/18/19/20/logo-2078018_640.png"
+          alt="Logo"
+          width={40}
+          height={40}
+          className={cn(
+            "h-10 w-10 cursor-pointer rounded-full object-cover transition-transform duration-300 ease-in-out",
+            isOpen && "rotate-[360deg]",
+          )}
+        />
+
+        <h1
+          className={cn(
+            "origin-left whitespace-nowrap text-xl font-semibold text-zinc-50 transition-all duration-200 ease-in-out",
+            isOpen ? "scale-100 opacity-100" : "scale-0 opacity-0",
+          )}
+        >
+          Admin Dashboard
+        </h1>
       </div>
-      <div>
-        <p className="text-base font-semibold text-slate-900">Bissinger OS</p>
-        <p className="text-sm text-slate-500">Projektsteuerung</p>
+
+      <nav
+        aria-label="Dashboard-Navigation"
+        className="mt-6 h-[calc(100%-4.5rem)] overflow-hidden"
+      >
+        <ul className="space-y-0.5">
+          {menuItems.map((item, index) => (
+            <SidebarMenuItem
+              key={item.title}
+              item={item}
+              index={index}
+              isSidebarOpen={isOpen}
+              isSubmenuOpen={
+                item.submenuKey ? subMenus[item.submenuKey] : false
+              }
+              onToggleSubmenu={onToggleSubmenu}
+            />
+          ))}
+        </ul>
+      </nav>
+    </aside>
+  );
+}
+
+type SidebarMenuItemProps = {
+  item: MenuItem;
+  index: number;
+  isSidebarOpen: boolean;
+  isSubmenuOpen: boolean;
+  onToggleSubmenu: (menu: SubMenuKey) => void;
+};
+
+function SidebarMenuItem({
+  item,
+  index,
+  isSidebarOpen,
+  isSubmenuOpen,
+  onToggleSubmenu,
+}: SidebarMenuItemProps) {
+  const hasSubmenu =
+    Boolean(item.subMenuItems?.length) && Boolean(item.submenuKey);
+
+  return (
+    <li
+      className={cn(
+        "rounded-md px-4 py-3 text-zinc-50 transition-colors duration-300 ease-in-out hover:bg-zinc-800/50 hover:text-white",
+        item.gap ? "mt-9" : "mt-2",
+        index === 0 && "bg-zinc-800/40",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          if (item.submenuKey) {
+            onToggleSubmenu(item.submenuKey);
+          }
+        }}
+        aria-expanded={hasSubmenu ? isSubmenuOpen : undefined}
+        className={cn(
+          "flex w-full items-center gap-x-4 text-left",
+          hasSubmenu ? "justify-between" : "justify-start",
+        )}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-lg">{item.icon}</span>
+
+          <span
+            className={cn(
+              "origin-left whitespace-nowrap transition-all duration-300 ease-in-out",
+              isSidebarOpen ? "visible opacity-100" : "invisible w-0 opacity-0",
+            )}
+          >
+            {item.title}
+          </span>
+        </span>
+
+        {hasSubmenu && isSidebarOpen ? (
+          <span className="ml-auto text-sm">
+            {isSubmenuOpen ? <FaChevronDown /> : <FaChevronRight />}
+          </span>
+        ) : null}
+      </button>
+
+      {hasSubmenu && isSubmenuOpen && isSidebarOpen ? (
+        <ul className="pl-3 pt-4 text-zinc-300">
+          {item.subMenuItems?.map((subMenuItem) => (
+            <li key={subMenuItem}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-x-2 rounded-lg px-2 py-3 text-left text-sm transition-colors hover:bg-zinc-800"
+              >
+                <FaChevronRight className="text-xs" />
+                <span>{subMenuItem}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
+function DashboardHeader() {
+  return (
+    <header className="flex h-20 shrink-0 items-center justify-between bg-zinc-50 px-8 shadow-md">
+      <form
+        role="search"
+        onSubmit={(event) => event.preventDefault()}
+        className="flex h-11 w-full max-w-96 items-center rounded-full border border-zinc-300"
+      >
+        <label htmlFor="dashboard-search" className="sr-only">
+          Dashboard durchsuchen
+        </label>
+
+        <input
+          id="dashboard-search"
+          name="search"
+          type="search"
+          placeholder="Search..."
+          className="h-full min-w-0 flex-1 rounded-full border-none bg-zinc-50 px-4 outline-none"
+        />
+
+        <button
+          type="submit"
+          aria-label="Suchen"
+          className="flex h-full items-center justify-center border-l border-zinc-300 px-4 text-base text-zinc-600"
+        >
+          <FaSearch />
+        </button>
+      </form>
+
+      <div className="ml-6 flex shrink-0 items-center gap-x-8">
+        <button
+          type="button"
+          aria-label="3 neue Benachrichtigungen"
+          className="relative"
+        >
+          <span className="absolute -right-2.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">
+            3
+          </span>
+          <FaBell className="text-xl" />
+        </button>
+
+        <Image
+          src="https://cdn.pixabay.com/photo/2016/11/21/11/17/model-1844729_640.jpg"
+          alt="Profilbild"
+          width={44}
+          height={44}
+          className="h-11 w-11 cursor-pointer rounded-full object-cover"
+        />
       </div>
+    </header>
+  );
+}
+
+function DashboardContent() {
+  return (
+    <div className="flex-1 overflow-hidden px-8 py-6">
+      <h2 className="text-xl font-medium text-zinc-800">
+        This is the Dashboard page.
+      </h2>
     </div>
   );
 }
 
-function StatusBadge({ children }: { children: React.ReactNode }) {
+export default function HomePage() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [subMenus, setSubMenus] = useState<Record<SubMenuKey, boolean>>({
+    inbox: false,
+    settings: false,
+  });
+
+  const toggleSubMenu = (menu: SubMenuKey): void => {
+    setSubMenus((previousSubMenus) => ({
+      ...previousSubMenus,
+      [menu]: !previousSubMenus[menu],
+    }));
+  };
+
   return (
-    <span className="inline-flex items-center rounded-full bg-[rgba(67,84,255,0.1)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#4254ff]">
-      {children}
-    </span>
-  );
-}
+    <main className="flex h-full w-full overflow-hidden bg-zinc-100">
+      <Sidebar
+        isOpen={isSidebarOpen}
+        subMenus={subMenus}
+        onToggleSidebar={() => setIsSidebarOpen((previousOpen) => !previousOpen)}
+        onToggleSubmenu={toggleSubMenu}
+      />
 
-export default function DashboardPage() {
-  return (
-    <section className="grid min-h-[calc(100vh-1.5rem)] grid-cols-1 gap-4 rounded-[2rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(245,248,252,0.96))] p-3 shadow-[0_25px_90px_rgba(38,51,77,0.12)] backdrop-blur lg:grid-cols-[280px_1fr] lg:p-4">
-      <aside className="flex flex-col rounded-[1.6rem] bg-[linear-gradient(180deg,#ffffff_0%,#f7f9fc_100%)] p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-        <BrandMark />
-
-        <nav className="mt-10 space-y-2">
-          {navigationItems.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
-                item.active
-                  ? 'bg-[linear-gradient(135deg,#2f46ff,#5748ff)] text-white shadow-[0_12px_24px_rgba(67,84,255,0.22)]'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <span>{item.label}</span>
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  item.active ? 'bg-white' : 'bg-slate-300'
-                }`}
-              />
-            </button>
-          ))}
-        </nav>
-
-        <div className="mt-auto rounded-[1.5rem] bg-[linear-gradient(180deg,#0f172a_0%,#172554_100%)] p-5 text-white">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
-            Heute
-          </p>
-          <p className="mt-3 text-3xl font-semibold">15</p>
-          <p className="text-sm text-white/72">Juli 2026</p>
-          <p className="mt-4 text-sm leading-6 text-white/72">
-            3 Termine, 5 offene Freigaben und 2 wichtige Kundenrueckfragen.
-          </p>
-        </div>
-      </aside>
-
-      <div className="grid min-h-0 grid-cols-1 gap-4">
-        <header className="flex flex-col gap-4 rounded-[1.6rem] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#4254ff]">
-              Dashboard
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-4xl">
-              Willkommen zurück, Max.
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">
-              Hier sehen Sie die wichtigsten Projekt-, Kunden- und
-              Aufgabeninformationen auf einen Blick.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Organisation: <span className="font-semibold text-slate-900">Bissinger Lights</span>
-            </div>
-            <Link
-              href="/login"
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#2f46ff,#5748ff)] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(67,84,255,0.22)] transition-colors duration-200 hover:border-[#4a4cff] hover:bg-white hover:bg-none hover:text-[#4a4cff]"
-            >
-              Zur Auth-Strecke
-            </Link>
-          </div>
-        </header>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {metricCards.map((card) => (
-            <article
-              key={card.label}
-              className="rounded-[1.6rem] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]"
-            >
-              <p className="text-sm font-medium text-slate-500">{card.label}</p>
-              <p className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-slate-900">
-                {card.value}
-              </p>
-              <p className="mt-3 text-sm text-slate-500">{card.detail}</p>
-            </article>
-          ))}
-        </div>
-
-        <div className="grid min-h-0 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <section className="rounded-[1.6rem] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4254ff]">
-                  Projekte
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-900">
-                  Laufende Projekte
-                </h2>
-              </div>
-              <StatusBadge>Live</StatusBadge>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-[1.4rem] border border-slate-200">
-              <div className="grid grid-cols-[1.6fr_1fr_1fr_0.8fr_0.8fr] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                <span>Projekt</span>
-                <span>Phase</span>
-                <span>Verantwortlich</span>
-                <span>Faellig</span>
-                <span>Status</span>
-              </div>
-
-              <div className="divide-y divide-slate-200">
-                {projectRows.map((row) => (
-                  <div
-                    key={row.name}
-                    className="grid grid-cols-[1.6fr_1fr_1fr_0.8fr_0.8fr] items-center px-4 py-4 text-sm text-slate-600"
-                  >
-                    <span className="font-medium text-slate-900">{row.name}</span>
-                    <span>{row.stage}</span>
-                    <span>{row.owner}</span>
-                    <span>{row.due}</span>
-                    <span className="font-medium text-[#4254ff]">{row.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <div className="grid gap-4">
-            <section className="rounded-[1.6rem] bg-[linear-gradient(180deg,#0f172a_0%,#1e3a8a_100%)] p-5 text-white shadow-[0_10px_35px_rgba(15,23,42,0.16)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/60">
-                Fokus
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
-                Prioritaeten heute
-              </h2>
-              <ul className="mt-5 space-y-3 text-sm leading-6 text-white/78">
-                {taskItems.map((task) => (
-                  <li
-                    key={task}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-                  >
-                    {task}
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="rounded-[1.6rem] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4254ff]">
-                Aktivitaet
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-900">
-                Letzte Aenderungen
-              </h2>
-
-              <div className="mt-6 space-y-4">
-                {timelineItems.map((item) => (
-                  <article
-                    key={item.title}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-medium text-slate-900">{item.title}</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-500">
-                          {item.text}
-                        </p>
-                      </div>
-                      <span className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                        {item.time}
-                      </span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-    </section>
+      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-zinc-100">
+        <DashboardHeader />
+        <DashboardContent />
+      </section>
+    </main>
   );
 }
