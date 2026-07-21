@@ -152,3 +152,50 @@
 [32m[Nest] 268  - [39m21.07.2026, 18:40:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/customers/:id, PATCH} route[39m[38;5;3m +1ms[39m
 [32m[Nest] 268  - [39m21.07.2026, 18:40:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/customers/:id/archive, POST} route[39m[38;5;3m +2ms[39m
 [32m[Nest] 268  - [39m21.07.2026, 18:40:15 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +358ms[39m
+[2J[3J[H[[90m19:03:45[0m] File change detected. Starting incremental compilation...
+
+[2J[3J[H[[90m19:03:45[0m] File change detected. Starting incremental compilation...
+
+[2J[3J[H[[90m19:03:46[0m] File change detected. Starting incremental compilation...
+
+[[90m19:03:46[0m] Found 0 errors. Watching for file changes.
+
+[2J[3J[H[[90m19:03:48[0m] File change detected. Starting incremental compilation...
+
+[[90m19:03:49[0m] Found 0 errors. Watching for file changes.
+
+[2J[3J[H[[90m19:03:55[0m] File change detected. Starting incremental compilation...
+
+[[90m19:03:56[0m] Found 0 errors. Watching for file changes.
+
+[2J[3J[H[[90m19:04:02[0m] File change detected. Starting incremental compilation...
+
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +59ms[39m
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPrismaModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHealthModule dependencies initialized[39m[38;5;3m +4ms[39m
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUsersModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 15984  - [39m21.07.2026, 19:04:03 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCustomersModule dependencies initialized[39m[38;5;3m +2ms[39m
+[[90m19:04:03[0m] Found 0 errors. Watching for file changes.
+
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +42ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPrismaModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHealthModule dependencies initialized[39m[38;5;3m +10ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUsersModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCustomersModule dependencies initialized[39m[38;5;3m +42ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mHealthController {/api/v1/health}:[39m[38;5;3m +12ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/health, GET} route[39m[38;5;3m +41ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUsersController {/api/v1}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/me, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mCustomersController {/api/v1/customers}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/customers, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/customers/:id, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/customers, POST} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/customers/:id, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:08 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/customers/:id/archive, POST} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 16400  - [39m21.07.2026, 19:04:09 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +200ms[39m
