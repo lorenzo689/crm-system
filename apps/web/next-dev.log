@@ -11,3 +11,9 @@ Creating turbopack project {
  GET /dashboard 200 in 9.3s (next.js: 8.1s, application-code: 1164ms)
  GET /profile 200 in 1125ms (next.js: 912ms, application-code: 214ms)
  GET /customers 200 in 1676ms (next.js: 1089ms, application-code: 587ms)
+  Reload env: .env
+ GET / 200 in 742ms (next.js: 582ms, application-code: 161ms)
+ GET /dashboard-content 404 in 542ms (next.js: 464ms, application-code: 79ms)
+ GET /dashboard 200 in 717ms (next.js: 52ms, application-code: 665ms)
+ GET /customers 200 in 109ms (next.js: 58ms, application-code: 51ms)
+ GET /dashboard 200 in 94ms (next.js: 10ms, application-code: 84ms)
