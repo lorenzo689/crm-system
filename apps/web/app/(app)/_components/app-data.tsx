@@ -11,6 +11,7 @@ import {
 
 export type MenuItem = {
   title: string;
+  href: string;
   icon: ReactNode;
   gap?: boolean;
 };
@@ -38,13 +39,13 @@ export type AttentionProject = {
 };
 
 export const menuItems: MenuItem[] = [
-  { title: "Übersicht", icon: <FiGrid /> },
-  { title: "Kunden", icon: <FiUsers />, gap: true },
-  { title: "Projekte", icon: <FiFolder /> },
-  { title: "Aufgaben", icon: <FiList /> },
-  { title: "Kalender", icon: <FiCalendar /> },
-  { title: "Dokumente", icon: <FiFileText /> },
-  { title: "Einstellungen", icon: <FiSettings /> },
+  { title: "Übersicht", href: "/dashboard", icon: <FiGrid /> },
+  { title: "Kunden", href: "/customers", icon: <FiUsers />, gap: true },
+  { title: "Projekte", href: "/projects", icon: <FiFolder /> },
+  { title: "Aufgaben", href: "/tasks", icon: <FiList /> },
+  { title: "Kalender", href: "/calendar", icon: <FiCalendar /> },
+  { title: "Dokumente", href: "/documents", icon: <FiFileText /> },
+  { title: "Einstellungen", href: "/settings", icon: <FiSettings /> },
 ];
 
 export const kpiItems: KpiItem[] = [

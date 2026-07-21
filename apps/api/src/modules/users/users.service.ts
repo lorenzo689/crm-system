@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -14,6 +18,19 @@ export class UsersService {
             throw new NotFoundException('User not found');
         }
 
-        return user; 
+    return user; 
+  }
+
+  async getOrganizationId(userId: string): Promise<string> {
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId },
+      select: { organizationId: true },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('User has no organization membership');
     }
+
+    return membership.organizationId;
+  }
 }

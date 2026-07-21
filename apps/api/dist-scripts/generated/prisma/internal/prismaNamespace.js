@@ -168,6 +168,8 @@ exports.CustomerScalarFieldEnum = {
     id: 'id',
     organizationId: 'organizationId',
     name: 'name',
+    customerNumber: 'customerNumber',
+    website: 'website',
     status: 'status',
     description: 'description',
     createdAt: 'createdAt',

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { FaBell, FaSearch } from "react-icons/fa";
 
-export function DashboardHeader() {
+export function AppHeader() {
   return (
     <header className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-8 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur">
       <div className="flex min-w-0 items-center gap-6">

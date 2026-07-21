@@ -148,6 +148,8 @@ model Customer {
   id             String            @id @default(uuid()) @db.Uuid
   organizationId String            @db.Uuid
   name           String
+  customerNumber String
+  website        String?
   status         CustomerStatus    @default(ACTIVE)
   description    String?
   createdAt      DateTime          @default(now())
@@ -158,6 +160,7 @@ model Customer {
   addresses      CustomerAddress[]
   projectLinks   ProjectCustomer[]
 
+  @@unique([organizationId, customerNumber])
   @@index([organizationId, name])
   @@index([organizationId, archivedAt])
   @@map("customers")

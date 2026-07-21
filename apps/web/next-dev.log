@@ -1,0 +1,13 @@
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.178.20:3000
+✓ Ready in 2.0s
+Creating turbopack project {
+  dir: 'C:\\Users\\Lorin\\OneDrive\\Desktop\\crm-system\\apps\\web',
+  testMode: true
+}
+
+○ Compiling /dashboard ...
+ GET /dashboard 200 in 9.3s (next.js: 8.1s, application-code: 1164ms)
+ GET /profile 200 in 1125ms (next.js: 912ms, application-code: 214ms)
+ GET /customers 200 in 1676ms (next.js: 1089ms, application-code: 587ms)

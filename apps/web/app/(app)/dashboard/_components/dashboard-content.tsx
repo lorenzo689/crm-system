@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { attentionProjects, kpiItems, tasks } from "./dashboard-data";
+import { attentionProjects, kpiItems, tasks } from "../../_components/app-data";
 
 export function DashboardContent() {
   return (

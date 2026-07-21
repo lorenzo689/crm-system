@@ -1,25 +1,31 @@
+"use client";
+
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
 } from "react-icons/tb";
 
-import { menuItems, type MenuItem } from "./dashboard-data";
+import { menuItems, type MenuItem } from "./app-data";
 import {
   cn,
   SIDEBAR_CLOSED_WIDTH,
   SIDEBAR_OPEN_WIDTH,
-} from "./dashboard-utils";
+} from "./app-utils";
 
-type DashboardSidebarProps = {
+type AppSidebarProps = {
   isOpen: boolean;
   onToggleSidebar: () => void;
 };
 
-export function DashboardSidebar({
+export function AppSidebar({
   isOpen,
   onToggleSidebar,
-}: DashboardSidebarProps) {
+}: AppSidebarProps) {
+  const pathname = usePathname();
+
   return (
     <aside
       className={cn(
@@ -71,15 +77,17 @@ export function DashboardSidebar({
       </div>
 
       <nav
-        aria-label="Dashboard-Navigation"
+        aria-label="Hauptnavigation"
         className={cn("min-h-0 flex-1", isOpen ? "mt-6" : "mt-8")}
       >
         <ul className="space-y-0.5">
-          {menuItems.map((item, index) => (
+          {menuItems.map((item) => (
             <SidebarMenuItem
-              key={item.title}
+              key={item.href}
               item={item}
-              index={index}
+              isActive={
+                pathname === item.href || pathname.startsWith(`${item.href}/`)
+              }
               isSidebarOpen={isOpen}
             />
           ))}
@@ -120,13 +128,13 @@ export function DashboardSidebar({
 
 type SidebarMenuItemProps = {
   item: MenuItem;
-  index: number;
+  isActive: boolean;
   isSidebarOpen: boolean;
 };
 
 function SidebarMenuItem({
   item,
-  index,
+  isActive,
   isSidebarOpen,
 }: SidebarMenuItemProps) {
   return (
@@ -134,11 +142,11 @@ function SidebarMenuItem({
       className={cn(
         "group rounded-xl px-4 py-3 text-zinc-50 transition-colors duration-300 ease-in-out hover:cursor-pointer hover:bg-white hover:text-[#1d1d1f]",
         item.gap ? "mt-9" : "mt-2",
-        index === 0 && "bg-white/5",
+        isActive && "bg-white/5",
       )}
     >
-      <button
-        type="button"
+      <Link
+        href={item.href}
         className={cn(
           "flex w-full cursor-pointer items-center text-left",
           isSidebarOpen ? "justify-start gap-x-4" : "justify-center",
@@ -157,7 +165,7 @@ function SidebarMenuItem({
             {item.title}
           </span>
         </span>
-      </button>
+      </Link>
     </li>
   );
 }
