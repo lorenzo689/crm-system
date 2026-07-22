@@ -26,7 +26,8 @@ Dieses Verzeichnis enthält die verbindlichen Architekturentscheidungen für **B
 | [002](002-modular-monolith.md) | Modularer NestJS-Monolith | Accepted |
 | [003](003-postgresql.md) | PostgreSQL als primäre Datenbank | Accepted |
 | [004](004-rest-api.md) | Versionierte REST-API mit OpenAPI | Accepted |
-| [005](005-microsoft-365-authentication.md) | Authentifizierung mit Microsoft Entra ID | Accepted |
+| [005](005-microsoft-365-authentication.md) | Authentifizierung mit Microsoft Entra ID | Superseded |
 | [006](006-managed-cloud.md) | Managed Cloud in der EU, bevorzugt Microsoft Azure | Accepted |
+| [007](007-local-password-authentication.md) | Lokale Authentifizierung mit E-Mail und Passwort | Accepted |
 
 Letzte Aktualisierung: 2026-07-11

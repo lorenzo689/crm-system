@@ -1,86 +1,184 @@
-import Image from 'next/image';
-import Link from 'next/link';
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
+import { login as loginRequest } from "@/lib/auth-api";
+
+function BrandMark() {
+  return (
+    <Link
+      href="/"
+      className="inline-flex items-center gap-3"
+      aria-label="Bissinger OS Startseite"
+    >
+      <Image
+        src="/images/images.jpg"
+        alt="Bissinger Lights Logo"
+        width={42}
+        height={42}
+        className="h-10 w-10 rounded-lg object-cover"
+      />
+      <span className="text-[1.05rem] font-semibold tracking-[-0.035em] text-[#151515]">
+        Bissinger OS
+      </span>
+    </Link>
+  );
+}
 
 export default function LoginPage() {
-  return (
-    <div className="flex min-h-screen w-full flex-col items-start overflow-hidden md:flex-row">
-      <div className="relative min-h-[320px] w-full md:min-h-screen md:w-1/2">
-        <Image
-          src="/images/background.jpg"
-          alt="Login Cover"
-          fill
-          priority
-          className="object-cover"
-        />
-        <div className="absolute inset-0 bg-black/55" />
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-        <div className="absolute inset-0 z-10 flex items-center justify-start px-8 py-10 sm:px-12 lg:px-16 xl:px-20">
-          <div className="flex w-full max-w-[440px] flex-col text-left">
-            <p className="text-[0.78rem] font-semibold uppercase tracking-[0.24em] text-[#e4ac3a] sm:text-[0.82rem]">
-              Bissinger OS
-            </p>
-            <div className="mt-5 flex flex-col gap-1">
-              <h1 className="whitespace-nowrap text-[3.35rem] font-semibold leading-[1.01] tracking-[-0.05em] text-white sm:text-[4.1rem]">
-                Orientierung sichtbar.
-              </h1>
-              <h1 className="whitespace-nowrap text-[3.35rem] font-semibold leading-[1.01] tracking-[-0.05em] text-white sm:text-[4.1rem]">
-                Raumwirkung ruhig.
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const { accessToken } = await loginRequest({ email, password });
+      localStorage.setItem("accessToken", accessToken);
+      router.push("/dashboard");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <main className="grid min-h-screen bg-white lg:grid-cols-2">
+      <section className="relative flex min-h-screen flex-col px-7 py-7 sm:px-12 sm:py-10 lg:px-14 xl:px-20">
+        <BrandMark />
+
+        <div className="flex flex-1 items-center justify-center py-16">
+          <div className="w-full max-w-[390px]">
+            <div className="mb-10">
+              <p className="text-sm font-medium text-[#686868]">
+                Willkommen zurück
+              </p>
+              <h1 className="mt-2 text-[2rem] font-semibold leading-tight tracking-[-0.045em] text-[#171717]">
+                Anmelden bei Bissinger OS
               </h1>
             </div>
-            <p className="mt-6 max-w-[370px] text-[0.98rem] font-normal leading-8 text-white/70 sm:text-[1rem]">
-              Die zentrale Plattform für Kunden, Projekte, Angebote,
-              Kommunikation und Aufgaben.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      <div className="relative flex min-h-screen w-full items-center justify-center border-l border-[#e6d9ca] bg-[#f5f5f5] px-6 py-10 shadow-[-1px_0_0_rgba(255,255,255,0.62)] before:absolute before:left-0 before:top-1/2 before:h-[84%] before:w-5 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-[linear-gradient(180deg,rgba(247,241,232,0.0)_0%,rgba(247,241,232,0.95)_16%,rgba(247,241,232,0.95)_84%,rgba(247,241,232,0.0)_100%)] sm:px-10 lg:w-1/2 lg:px-20">
-        <div className="mx-auto flex w-full max-w-[560px] flex-col justify-center">
-          <div className="inline-flex w-fit rounded-sm border border-[#eadfce] bg-[#f6eee5] px-3 py-1.5">
-            <p className="text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-[#b96a16]">
-              Interner Zugang
-            </p>
-          </div>
+            <form
+              className="space-y-6"
+              onSubmit={handleSubmit}
+            >
+              {error && (
+                <div
+                  role="alert"
+                  className="rounded-[0.3rem] border border-[#f1c7c3] bg-[#fff6f5] px-4 py-3 text-sm text-[#9f2d24]"
+                >
+                  {error}
+                </div>
+              )}
 
-          <div className="mt-8 flex w-full flex-col">
-            <h2 className="text-[2.05rem] font-semibold tracking-[-0.04em] text-[#111111]">
-              Willkommen zurück
-            </h2>
-            <p className="mt-3 max-w-[500px] text-[1rem] leading-8 text-[#758096]">
-              Melden Sie sich mit Ihrem Microsoft-Konto von Bissinger Lights
-              an, um auf Projekte, Kunden und Aufgaben zuzugreifen.
-            </p>
-          </div>
+              <div className="relative">
+                <label
+                  htmlFor="email"
+                  className="absolute -top-2.5 left-4 z-10 bg-white px-1.5 text-xs font-medium text-[#6b6b6b]"
+                >
+                  E-Mail
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@bissinger-lights.de"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  className="h-14 w-full rounded-[0.3rem] border border-[#cfcfcf] bg-white px-4 pr-12 text-sm text-[#1f1f1f] outline-none transition placeholder:text-[#aaa] focus:border-[#d69a35] focus:ring-1 focus:ring-[#d69a35]"
+                />
+                <FiMail className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-lg text-[#aaa]" />
+              </div>
 
-          <div className="mt-10 flex w-full flex-col">
-            <button className="flex h-[62px] w-full cursor-pointer items-center justify-center rounded-xl border border-transparent bg-[#111111] px-6 text-center text-[1.02rem] font-semibold text-white transition-colors duration-150 hover:border-[#111111] hover:bg-white hover:text-[#111111]">
-              <Image
-                src="/images/microsoft.png"
-                alt="Microsoft Icon"
-                width={24}
-                height={24}
-                className="mr-4 h-6 w-6"
-              />
-              Mit Microsoft anmelden
-            </button>
-          </div>
+              <div className="relative">
+                <label
+                  htmlFor="password"
+                  className="absolute -top-2.5 left-4 z-10 bg-white px-1.5 text-xs font-medium text-[#6b6b6b]"
+                >
+                  Passwort
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Passwort eingeben"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  className="h-14 w-full rounded-[0.3rem] border border-[#cfcfcf] bg-white px-4 pr-12 text-sm text-[#1f1f1f] outline-none transition placeholder:text-[#aaa] focus:border-[#d69a35] focus:ring-1 focus:ring-[#d69a35]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={
+                    showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                  }
+                  className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 cursor-pointer place-items-center text-lg text-[#aaa] transition hover:text-[#222]"
+                >
+                  {showPassword ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
 
-          <div className="mt-8 w-full border-t border-[#ebe5dd]" />
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-[#171717] transition hover:text-[#d69a35]"
+                >
+                  Passwort vergessen?
+                </Link>
+              </div>
 
-          <div className="mt-8 flex w-full items-center justify-center">
-            <p className="text-center text-[0.98rem] font-normal text-[#a5acb8]">
-              Noch kein Zugang?{' '}
-              <Link
-                href="/contact-admin"
-                className="cursor-pointer font-semibold text-black transition-colors duration-150 hover:text-[#111111]"
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[0.3rem] bg-[#171717] px-6 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(0,0,0,0.12)] transition hover:bg-[#d69a35] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d69a35] disabled:cursor-wait disabled:bg-[#777]"
               >
-                Administrator kontaktieren
-              </Link>
-            </p>
+                <FiLock className="text-base" />
+                {isLoading ? "Anmeldung läuft …" : "Anmelden"}
+              </button>
+            </form>
           </div>
         </div>
-      </div>
-    </div>
+
+        <p className="text-sm text-[#777]">
+          Noch kein Konto?{" "}
+          <Link
+            href="/register"
+            className="font-semibold text-[#171717] transition hover:text-[#d69a35]"
+          >
+            Registrieren
+          </Link>
+        </p>
+      </section>
+
+      <aside className="relative hidden min-h-screen overflow-hidden bg-[#111827] lg:block">
+        <Image
+          src="/images/Buehnenkantenbeleuchtung.jpeg"
+          alt="Beleuchtete Bühnenkanten mit blauen und warmweißen Lichtlinien"
+          fill
+          priority
+          sizes="50vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-black/10" />
+      </aside>
+    </main>
   );
 }
