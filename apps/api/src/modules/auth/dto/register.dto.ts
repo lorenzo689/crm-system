@@ -1,0 +1,28 @@
+import {
+  IsEmail,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+
+export class RegisterDto {
+  @IsEmail()
+  @Matches(/@bissinger-lights\.de$/i, {
+    message: 'Nur Bissinger-Lights-E-Mail-Adressen sind erlaubt',
+  })
+  email!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  displayName!: string;
+
+  @IsString()
+  @MinLength(8)
+  @Matches(/^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/, {
+    message:
+      'Passwort muss mindestens 8 Zeichen, einen Großbuchstaben, eine Zahl und ein Sonderzeichen enthalten',
+  })
+  password!: string;
+}
