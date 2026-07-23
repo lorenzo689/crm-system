@@ -130,7 +130,14 @@ export default function CustomersPage() {
 
       return sortDirection === "asc" ? comparison : comparison * -1;
     });
-  }, [archiveFilter, customers, searchQuery, sortDirection, sortKey, statusFilter]);
+  }, [
+    archiveFilter,
+    customers,
+    searchQuery,
+    sortDirection,
+    sortKey,
+    statusFilter,
+  ]);
 
   const hasActiveFilters =
     archiveFilter !== defaultArchiveFilter ||

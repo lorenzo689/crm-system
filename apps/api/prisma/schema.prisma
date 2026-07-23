@@ -4,8 +4,8 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
   moduleFormat = "cjs"
 }
 
@@ -100,33 +100,33 @@ model Organization {
 }
 
 model User {
-  id                 String                 @id @default(uuid()) @db.Uuid
-  email              String                 @unique
-  displayName        String
-  passwordHash       String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  archivedAt         DateTime?
-  externalIdentities ExternalIdentity[]
-  organizationRoles  OrganizationMember[]
-  projectMemberships ProjectMember[]
-  taskAssignments    TaskAssignment[]
-  notesAuthored      Note[]
-  activitiesLogged   Activity[]             @relation("ActivityActor")
-  statusChanges      ProjectStatusHistory[]
+  id                  String                 @id @default(uuid()) @db.Uuid
+  email               String                 @unique
+  displayName         String
+  passwordHash        String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  archivedAt          DateTime?
+  externalIdentities  ExternalIdentity[]
+  organizationRoles   OrganizationMember[]
+  projectMemberships  ProjectMember[]
+  taskAssignments     TaskAssignment[]
+  notesAuthored       Note[]
+  activitiesLogged    Activity[]             @relation("ActivityActor")
+  statusChanges       ProjectStatusHistory[]
   passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  token     String   @unique
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@map("password_reset_tokens")
@@ -171,7 +171,7 @@ model Customer {
   updatedAt      DateTime          @updatedAt
   archivedAt     DateTime?
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  contacts       CustomerContact[]
+  contacts       Contact[]
   addresses      CustomerAddress[]
   projectLinks   ProjectCustomer[]
 
@@ -182,19 +182,21 @@ model Customer {
 }
 
 model Contact {
-  id             String            @id @default(uuid()) @db.Uuid
-  organizationId String            @db.Uuid
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  customerId     String           @db.Uuid
   fullName       String
   email          String?
   phone          String?
   jobTitle       String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
   archivedAt     DateTime?
-  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customers      CustomerContact[]
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
   projectLinks   ProjectContact[]
 
+  @@index([customerId])
   @@index([organizationId, fullName])
   @@index([organizationId, archivedAt])
   @@map("contacts")
@@ -218,21 +220,6 @@ model Address {
   @@index([organizationId, city])
   @@index([organizationId, archivedAt])
   @@map("addresses")
-}
-
-model CustomerContact {
-  id         String              @id @default(uuid()) @db.Uuid
-  customerId String              @db.Uuid
-  contactId  String              @db.Uuid
-  role       CustomerContactRole @default(PRIMARY)
-  isPrimary  Boolean             @default(false)
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
-  customer   Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  contact    Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
-
-  @@unique([customerId, contactId])
-  @@map("customer_contacts")
 }
 
 model CustomerAddress {

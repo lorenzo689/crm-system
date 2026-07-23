@@ -9,6 +9,19 @@ export type Customer = {
   updatedAt: string;
 };
 
+export type Contact = {
+  id: string;
+  organizationId: string;
+  customerId: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  jobTitle: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const statusStyles: Record<Customer["status"], string> = {
   ACTIVE: "bg-emerald-50 text-emerald-700",
   LEAD: "bg-amber-50 text-amber-700",

@@ -104,7 +104,7 @@ export function CustomerFormModal({
       try {
         new URL(normalizeWebsite(formState.website));
       } catch {
-        return "Bitte eine gueltige Website-URL eingeben.";
+        return "Bitte eine gültige Website-URL eingeben.";
       }
     }
 
@@ -140,10 +140,13 @@ export function CustomerFormModal({
         });
         onSaved(createdCustomer.id);
       } else if (customer) {
-        const updatedCustomer = await apiFetch<Customer>(`/customers/${customer.id}`, {
-          body: JSON.stringify(payload),
-          method: "PATCH",
-        });
+        const updatedCustomer = await apiFetch<Customer>(
+          `/customers/${customer.id}`,
+          {
+            body: JSON.stringify(payload),
+            method: "PATCH",
+          },
+        );
         onSaved(updatedCustomer.id);
       }
 
@@ -216,9 +219,7 @@ export function CustomerFormModal({
                 placeholder="K-2019"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm placeholder:text-zinc-300 focus:border-amber-400 focus:outline-none"
               />
-              <p className="mt-1 text-xs text-zinc-400">
-                Format: K-1234
-              </p>
+              <p className="mt-1 text-xs text-zinc-400">Format: K-1234</p>
             </div>
 
             <div>
@@ -282,7 +283,7 @@ export function CustomerFormModal({
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-50"
             >
               {isSubmitting
-                ? "Wird gespeichert…"
+                ? "Wird gespeichert..."
                 : mode === "create"
                   ? "Kunde anlegen"
                   : "Änderungen speichern"}

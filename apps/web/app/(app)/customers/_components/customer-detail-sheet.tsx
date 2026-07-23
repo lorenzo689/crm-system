@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactList } from "./contact-list";
 import type { Customer } from "./customer-types";
 import { statusLabels, statusStyles } from "./customer-types";
 
@@ -118,6 +119,8 @@ export function CustomerDetailSheet({
               {customer.description || "Keine Beschreibung vorhanden."}
             </div>
           </section>
+
+          <ContactList customerId={customer.id} isOpen={isOpen} />
         </div>
 
         <div className="mt-auto border-t border-zinc-200 px-6 py-5">
@@ -136,7 +139,7 @@ export function CustomerDetailSheet({
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-50"
             >
               {isActionPending
-                ? "Wird gespeichert…"
+                ? "Wird gespeichert..."
                 : customer.archivedAt
                   ? "Entarchivieren"
                   : "Archivieren"}
