@@ -1,6 +1,7 @@
 "use client";
 
 import { ContactList } from "./contact-list";
+import { NoteList } from "./note-list";
 import type { Customer } from "./customer-types";
 import { statusLabels, statusStyles } from "./customer-types";
 
@@ -121,6 +122,7 @@ export function CustomerDetailSheet({
           </section>
 
           <ContactList customerId={customer.id} isOpen={isOpen} />
+          <NoteList customerId={customer.id} isOpen={isOpen} />
         </div>
 
         <div className="mt-auto border-t border-zinc-200 px-6 py-5">

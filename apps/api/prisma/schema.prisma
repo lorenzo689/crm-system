@@ -100,21 +100,22 @@ model Organization {
 }
 
 model User {
-  id                  String                 @id @default(uuid()) @db.Uuid
-  email               String                 @unique
-  displayName         String
-  passwordHash        String?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  archivedAt          DateTime?
-  externalIdentities  ExternalIdentity[]
-  organizationRoles   OrganizationMember[]
-  projectMemberships  ProjectMember[]
-  taskAssignments     TaskAssignment[]
-  notesAuthored       Note[]
-  activitiesLogged    Activity[]             @relation("ActivityActor")
-  statusChanges       ProjectStatusHistory[]
-  passwordResetTokens PasswordResetToken[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  email                 String                 @unique
+  displayName           String
+  passwordHash          String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  archivedAt            DateTime?
+  externalIdentities    ExternalIdentity[]
+  organizationRoles     OrganizationMember[]
+  projectMemberships    ProjectMember[]
+  taskAssignments       TaskAssignment[]
+  notesAuthored         Note[]
+  customerNotesAuthored CustomerNote[]         @relation("CustomerNoteAuthor")
+  activitiesLogged      Activity[]             @relation("ActivityActor")
+  statusChanges         ProjectStatusHistory[]
+  passwordResetTokens   PasswordResetToken[]
 
   @@map("users")
 }
@@ -172,6 +173,7 @@ model Customer {
   archivedAt     DateTime?
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   contacts       Contact[]
+  notes          CustomerNote[]
   addresses      CustomerAddress[]
   projectLinks   ProjectCustomer[]
 
@@ -200,6 +202,21 @@ model Contact {
   @@index([organizationId, fullName])
   @@index([organizationId, archivedAt])
   @@map("contacts")
+}
+
+model CustomerNote {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @db.Uuid
+  authorId   String    @db.Uuid
+  content    String
+  createdAt  DateTime  @default(now())
+  archivedAt DateTime?
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  author     User      @relation("CustomerNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
+  @@index([customerId, archivedAt])
+  @@map("customer_notes")
 }
 
 model Address {
