@@ -47,4 +47,11 @@ export class CustomersRepository {
       data: { archivedAt: new Date() },
     });
   }
+
+  async unarchive(id: string) {
+    return this.prisma.customer.update({
+      where: { id },
+      data: { archivedAt: null },
+    });
+  }
 }

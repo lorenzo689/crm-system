@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import { CustomerStatus } from '../../../../generated/prisma/enums';
+import { IsEnum, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -16,4 +17,8 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsEnum(CustomerStatus)
+  status?: CustomerStatus;
 }

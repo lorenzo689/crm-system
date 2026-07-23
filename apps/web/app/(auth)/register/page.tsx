@@ -13,6 +13,7 @@ import {
   FiUser,
 } from "react-icons/fi";
 import { register as registerRequest } from "@/lib/auth-api";
+import { storeAccessToken } from "@/lib/session";
 
 function BrandMark() {
   return (
@@ -102,7 +103,7 @@ export default function RegisterPage() {
         displayName,
         password,
       });
-      localStorage.setItem("accessToken", accessToken);
+      storeAccessToken(accessToken);
       router.push("/dashboard");
     } catch (caughtError) {
       setError(
@@ -131,10 +132,7 @@ export default function RegisterPage() {
               </h1>
             </div>
 
-            <form
-              className="space-y-5"
-              onSubmit={handleSubmit}
-            >
+            <form className="space-y-5" onSubmit={handleSubmit}>
               {error && (
                 <div
                   role="alert"
@@ -225,7 +223,7 @@ export default function RegisterPage() {
                     8 Zeichen
                   </PasswordRequirement>
                   <PasswordRequirement fulfilled={requirements.uppercase}>
-                    Großbuchstabe
+                    {"Gro\u00dfbuchstabe"}
                   </PasswordRequirement>
                   <PasswordRequirement fulfilled={requirements.number}>
                     Zahl
@@ -244,7 +242,7 @@ export default function RegisterPage() {
                     htmlFor="passwordConfirmation"
                     className="absolute -top-2.5 left-4 z-10 bg-white px-1.5 text-xs font-medium text-[#6b6b6b]"
                   >
-                    Passwort bestätigen
+                    {"Passwort best\u00e4tigen"}
                   </label>
                   <input
                     id="passwordConfirmation"
@@ -266,8 +264,8 @@ export default function RegisterPage() {
                     }
                     aria-label={
                       showPasswordConfirmation
-                        ? "Passwortbestätigung verbergen"
-                        : "Passwortbestätigung anzeigen"
+                        ? "Passwortbest\u00e4tigung verbergen"
+                        : "Passwortbest\u00e4tigung anzeigen"
                     }
                     className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 cursor-pointer place-items-center text-lg text-[#aaa] transition hover:text-[#222]"
                   >
@@ -281,8 +279,8 @@ export default function RegisterPage() {
                     }`}
                   >
                     {passwordsMatch
-                      ? "Passwörter stimmen überein"
-                      : "Passwörter stimmen nicht überein"}
+                      ? "Passw\u00f6rter stimmen \u00fcberein"
+                      : "Passw\u00f6rter stimmen nicht \u00fcberein"}
                   </p>
                 )}
               </div>
@@ -293,7 +291,7 @@ export default function RegisterPage() {
                 className="flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[0.3rem] bg-[#171717] px-6 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(0,0,0,0.12)] transition hover:bg-[#d69a35] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d69a35] disabled:cursor-not-allowed disabled:bg-[#b8b8b8] disabled:shadow-none"
               >
                 <FiLock className="text-base" />
-                {isLoading ? "Registrierung läuft …" : "Registrieren"}
+                {isLoading ? "Registrierung l\u00e4uft ..." : "Registrieren"}
               </button>
             </form>
           </div>
@@ -313,7 +311,9 @@ export default function RegisterPage() {
       <aside className="relative hidden min-h-screen overflow-hidden bg-[#111827] lg:block">
         <Image
           src="/images/Buehnenkantenbeleuchtung.jpeg"
-          alt="Beleuchtete Bühnenkanten mit blauen und warmweißen Lichtlinien"
+          alt={
+            "Beleuchtete B\u00fchnenkanten mit blauen und warmwei\u00dfen Lichtlinien"
+          }
           fill
           priority
           sizes="50vw"

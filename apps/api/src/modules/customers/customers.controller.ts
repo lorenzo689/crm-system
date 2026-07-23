@@ -72,4 +72,13 @@ export class CustomersController {
     );
     return this.customersService.archive(id, organizationId);
   }
+
+  @Post(':id/unarchive')
+  async unarchive(@Param('id') id: string, @Req() req: Request) {
+    const payload = req.user as JwtPayload;
+    const organizationId = await this.usersService.getOrganizationId(
+      payload.sub,
+    );
+    return this.customersService.unarchive(id, organizationId);
+  }
 }

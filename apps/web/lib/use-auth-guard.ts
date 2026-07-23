@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ACCESS_TOKEN_KEY } from "@/lib/session";
 
 export function useAuthGuard() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!token) {
       router.replace("/login");
       return;

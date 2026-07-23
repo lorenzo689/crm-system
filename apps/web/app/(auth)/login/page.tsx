@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
 import { login as loginRequest } from "@/lib/auth-api";
+import { consumeSessionNotice, storeAccessToken } from "@/lib/session";
 
 function BrandMark() {
   return (
@@ -34,7 +35,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setSessionNotice(consumeSessionNotice());
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,7 +49,7 @@ export default function LoginPage() {
 
     try {
       const { accessToken } = await loginRequest({ email, password });
-      localStorage.setItem("accessToken", accessToken);
+      storeAccessToken(accessToken);
       router.push("/dashboard");
     } catch (caughtError) {
       setError(
@@ -65,17 +71,23 @@ export default function LoginPage() {
           <div className="w-full max-w-[390px]">
             <div className="mb-10">
               <p className="text-sm font-medium text-[#686868]">
-                Willkommen zurück
+                {"Willkommen zur\u00fcck"}
               </p>
               <h1 className="mt-2 text-[2rem] font-semibold leading-tight tracking-[-0.045em] text-[#171717]">
                 Anmelden bei Bissinger OS
               </h1>
             </div>
 
-            <form
-              className="space-y-6"
-              onSubmit={handleSubmit}
-            >
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              {sessionNotice && (
+                <div
+                  role="status"
+                  className="rounded-[0.3rem] border border-[#f0d9a8] bg-[#fff7e8] px-4 py-3 text-sm text-[#805b10]"
+                >
+                  {sessionNotice}
+                </div>
+              )}
+
               {error && (
                 <div
                   role="alert"
@@ -151,7 +163,7 @@ export default function LoginPage() {
                 className="flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[0.3rem] bg-[#171717] px-6 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(0,0,0,0.12)] transition hover:bg-[#d69a35] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d69a35] disabled:cursor-wait disabled:bg-[#777]"
               >
                 <FiLock className="text-base" />
-                {isLoading ? "Anmeldung läuft …" : "Anmelden"}
+                {isLoading ? "Anmeldung l\u00e4uft ..." : "Anmelden"}
               </button>
             </form>
           </div>
@@ -171,7 +183,9 @@ export default function LoginPage() {
       <aside className="relative hidden min-h-screen overflow-hidden bg-[#111827] lg:block">
         <Image
           src="/images/Buehnenkantenbeleuchtung.jpeg"
-          alt="Beleuchtete Bühnenkanten mit blauen und warmweißen Lichtlinien"
+          alt={
+            "Beleuchtete B\u00fchnenkanten mit blauen und warmwei\u00dfen Lichtlinien"
+          }
           fill
           priority
           sizes="50vw"

@@ -1,7 +1,14 @@
+"use client";
+
 import Image from "next/image";
 import { FaBell, FaSearch } from "react-icons/fa";
+import { logout } from "@/lib/session";
 
 export function AppHeader() {
+  function handleLogout() {
+    logout();
+  }
+
   return (
     <header className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-8 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur">
       <div className="flex min-w-0 items-center gap-6">
@@ -56,6 +63,14 @@ export function AppHeader() {
           className="hidden h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50 lg:inline-flex"
         >
           Heute, 16. Juli
+        </button>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50"
+        >
+          Abmelden
         </button>
 
         <button

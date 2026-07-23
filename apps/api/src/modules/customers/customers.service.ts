@@ -61,4 +61,9 @@ export class CustomersService {
     await this.findOne(id, organizationId);
     return this.customersRepository.archive(id);
   }
+
+  async unarchive(id: string, organizationId: string) {
+    await this.findOne(id, organizationId);
+    return this.customersRepository.unarchive(id);
+  }
 }

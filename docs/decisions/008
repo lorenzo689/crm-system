@@ -1,0 +1,101 @@
+# Bissinger OS – Production-Readiness Todos: Auth / Login / Register
+
+Stand: 23. Juli 2026
+Kontext: Internes Tool für 3 Nutzer, aktuell nur lokal erreichbar. Diese
+Liste bündelt, was vor einem produktiven Betrieb (auch bei geplantem
+Zugriff nur über VPN/Tailscale) noch fehlt oder gehärtet werden sollte.
+
+---
+
+## Bereits umgesetzt (Referenz)
+
+- [x] Registrierung mit Domain-Einschränkung (`@bissinger-lights.de`)
+- [x] Passwort-Komplexität (min. 8 Zeichen, Großbuchstabe, Zahl, Sonderzeichen)
+- [x] Passwort-Hashing mit bcrypt (10 Salt-Runden)
+- [x] JWT-Auth mit Guard/Strategy, Ablaufzeit 7 Tage
+- [x] `/me` gibt `passwordHash` nicht mehr zurück (select statt full object)
+- [x] Einheitliche Fehlermeldung bei Login (kein Email-Enumeration-Leak)
+- [x] Timing-Angriff bei Login geschlossen (bcrypt.compare läuft immer)
+- [x] Rate Limiting global (`@nestjs/throttler`, 5 Requests/Minute)
+- [x] Passwort-Reset-Flow (forgot-password / reset-password) inkl. Token-Modell
+- [x] Reset-Link nur außerhalb von `production` in der API-Response sichtbar
+- [x] Zentrales 401-Handling im Frontend (auto-logout bei ungültigem Token)
+- [x] Logout-Funktion im Frontend
+- [x] Klare Fehlermeldung statt stillem 500-Crash bei fehlendem Org-Setup
+- [x] Route Protection im Frontend (Redirect zu `/login` ohne Token)
+
+---
+
+## Offen – vor produktivem Betrieb (auch hinter VPN)
+
+### Kritisch
+
+- [ ] **Echter Email-Versand für Passwort-Reset**
+      Aktuell wird der Reset-Link nur geloggt/in Dev zurückgegeben. Vor
+      jeder Nutzung außerhalb von euch dreien direkt im Terminal muss ein
+      echter Mailversand (z.B. Resend, SMTP) den Link zustellen, statt ihn
+      offenzulegen.
+- [ ] **Token-Storage: `localStorage` → httpOnly-Cookie**
+      Schützt gegen XSS-Auslesen des Access-Tokens. Erfordert Anpassung an
+      Login/Register-Response (Cookie statt JSON-Token), CORS mit
+      `credentials: 'include'`, und CSRF-Schutz (siehe unten).
+- [ ] **CSRF-Schutz**, sobald auf Cookies umgestellt wird
+      Ohne httpOnly-Cookie aktuell nicht nötig; wird mit obigem Punkt
+      Pflicht.
+
+### Wichtig
+
+- [ ] **Account-Lockout nach wiederholten Fehlversuchen**
+      Rate Limiting bremst pro Zeitfenster, verhindert aber keine über
+      Stunden verteilten Versuche. Ergänzend: Account nach z.B. 5-10
+      Fehlversuchen für einige Minuten sperren, unabhängig vom Rate Limit.
+- [ ] **Passwort ändern (im eingeloggten Zustand)**
+      Bisher nur „Passwort vergessen"-Flow vorhanden. Braucht eigenen
+      Endpoint (`PATCH /auth/change-password`) mit altem + neuem Passwort,
+      z.B. für die Profile-Seite.
+- [ ] **Security-Header (`helmet`)**
+      `pnpm add helmet`, `app.use(helmet())` in `main.ts`. Schnell
+      eingebaut, klarer Sicherheitsgewinn (CSP, X-Frame-Options etc.).
+- [ ] **Reset-Token-Aufräumung**
+      Abgelaufene/benutzte `PasswordResetToken`-Einträge sammeln sich in
+      der DB. Entweder periodischer Cleanup-Job oder bewusste Entscheidung,
+      das vorerst zu ignorieren (Datenmenge bei 3 Nutzern vernachlässigbar).
+
+### Nice-to-have, nicht blockierend
+
+- [ ] **Refresh-Token-Mechanismus**
+      Nur relevant, falls kürzere Access-Token-Laufzeiten gewünscht sind.
+      Bei 7 Tagen Laufzeit und 3 bekannten Nutzern aktuell nicht nötig.
+- [ ] **Audit-Log für sicherheitsrelevante Events**
+      Wer hat sich wann eingeloggt/fehlgeschlagen/Passwort geändert. Bei
+      3 Nutzern geringer Nutzen, aber günstig für spätere Nachvollziehbarkeit.
+- [ ] **2FA**
+      Für ein internes Tool mit VPN-Abschottung vermutlich nicht nötig;
+      Entscheidung bewusst offenlassen, nicht automatisch einbauen.
+- [ ] **"Angemeldet bleiben"-Option beim Login**
+      Nur relevant, falls variable Token-Laufzeiten gewünscht sind.
+- [ ] **Validierung von `displayName` gegen Script-/HTML-Injection**
+      Aktuell nur Längenprüfung. Nur relevant, falls der Wert irgendwo
+      ungefiltert gerendert wird (z.B. `dangerouslySetInnerHTML`) – aktuell
+      nicht der Fall, im Blick behalten.
+
+---
+
+## Netzwerk-/Deployment-Absicherung (separates Thema, siehe Chat)
+
+- [ ] Zugriff ausschließlich über Tailscale (VPN) statt offenem Internet
+- [ ] Hosting-Ort für API + Web + Postgres festlegen
+- [ ] `.env`-Secrets (JWT_SECRET, DATABASE_URL) für die Zielumgebung neu
+      generieren, nicht die lokalen Dev-Werte übernehmen
+
+---
+
+## Empfohlene Reihenfolge, wenn es an den produktiven Betrieb geht
+
+1. Email-Versand für Reset-Flow einrichten
+2. Tailscale-Setup (Netzwerk-Abschottung)
+3. `localStorage` → httpOnly-Cookie + CSRF-Schutz
+4. Security-Header (`helmet`)
+5. Account-Lockout
+6. Passwort ändern (eingeloggt)
+7. Rest nach Bedarf

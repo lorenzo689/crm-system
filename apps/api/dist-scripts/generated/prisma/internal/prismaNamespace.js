@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.defineExtension = exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.ProjectStatusHistoryScalarFieldEnum = exports.ActivityScalarFieldEnum = exports.NoteScalarFieldEnum = exports.TaskAssignmentScalarFieldEnum = exports.TaskScalarFieldEnum = exports.ProjectAddressScalarFieldEnum = exports.ProjectContactScalarFieldEnum = exports.ProjectMemberScalarFieldEnum = exports.ProjectCustomerScalarFieldEnum = exports.ProjectScalarFieldEnum = exports.CustomerAddressScalarFieldEnum = exports.CustomerContactScalarFieldEnum = exports.AddressScalarFieldEnum = exports.ContactScalarFieldEnum = exports.CustomerScalarFieldEnum = exports.OrganizationMemberScalarFieldEnum = exports.ExternalIdentityScalarFieldEnum = exports.UserScalarFieldEnum = exports.OrganizationScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
+exports.defineExtension = exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.ProjectStatusHistoryScalarFieldEnum = exports.ActivityScalarFieldEnum = exports.NoteScalarFieldEnum = exports.TaskAssignmentScalarFieldEnum = exports.TaskScalarFieldEnum = exports.ProjectAddressScalarFieldEnum = exports.ProjectContactScalarFieldEnum = exports.ProjectMemberScalarFieldEnum = exports.ProjectCustomerScalarFieldEnum = exports.ProjectScalarFieldEnum = exports.CustomerAddressScalarFieldEnum = exports.CustomerContactScalarFieldEnum = exports.AddressScalarFieldEnum = exports.ContactScalarFieldEnum = exports.CustomerScalarFieldEnum = exports.OrganizationMemberScalarFieldEnum = exports.ExternalIdentityScalarFieldEnum = exports.PasswordResetTokenScalarFieldEnum = exports.UserScalarFieldEnum = exports.OrganizationScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/client"));
 /**
  * Prisma Errors
@@ -105,6 +105,7 @@ exports.AnyNull = runtime.AnyNull;
 exports.ModelName = {
     Organization: 'Organization',
     User: 'User',
+    PasswordResetToken: 'PasswordResetToken',
     ExternalIdentity: 'ExternalIdentity',
     OrganizationMember: 'OrganizationMember',
     Customer: 'Customer',
@@ -145,9 +146,18 @@ exports.UserScalarFieldEnum = {
     id: 'id',
     email: 'email',
     displayName: 'displayName',
+    passwordHash: 'passwordHash',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     archivedAt: 'archivedAt'
+};
+exports.PasswordResetTokenScalarFieldEnum = {
+    id: 'id',
+    userId: 'userId',
+    token: 'token',
+    expiresAt: 'expiresAt',
+    usedAt: 'usedAt',
+    createdAt: 'createdAt'
 };
 exports.ExternalIdentityScalarFieldEnum = {
     id: 'id',
