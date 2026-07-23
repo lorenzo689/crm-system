@@ -14,4 +14,14 @@ export class UsersController {
     const payload = req.user as JwtPayload;
     return this.usersService.findById(payload.sub);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('users')
+  async findAll(@Req() req: Request) {
+    const payload = req.user as JwtPayload;
+    const organizationId = await this.usersService.getOrganizationId(
+      payload.sub,
+    );
+    return this.usersService.findAllInOrganization(organizationId);
+  }
 }

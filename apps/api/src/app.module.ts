@@ -6,6 +6,7 @@ import { ContactsModule } from './modules/contacts/contacts.module';
 import { CustomerNotesModule } from './modules/customer-notes/customer-notes.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { HealthModule } from './modules/health/health.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -17,6 +18,7 @@ import { UsersModule } from './modules/users/users.module';
     CustomersModule,
     ContactsModule,
     CustomerNotesModule,
+    ProjectsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

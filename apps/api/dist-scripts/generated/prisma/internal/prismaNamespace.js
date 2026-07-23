@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.defineExtension = exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.ProjectStatusHistoryScalarFieldEnum = exports.ActivityScalarFieldEnum = exports.NoteScalarFieldEnum = exports.TaskAssignmentScalarFieldEnum = exports.TaskScalarFieldEnum = exports.ProjectAddressScalarFieldEnum = exports.ProjectContactScalarFieldEnum = exports.ProjectMemberScalarFieldEnum = exports.ProjectCustomerScalarFieldEnum = exports.ProjectScalarFieldEnum = exports.CustomerAddressScalarFieldEnum = exports.CustomerContactScalarFieldEnum = exports.AddressScalarFieldEnum = exports.ContactScalarFieldEnum = exports.CustomerScalarFieldEnum = exports.OrganizationMemberScalarFieldEnum = exports.ExternalIdentityScalarFieldEnum = exports.PasswordResetTokenScalarFieldEnum = exports.UserScalarFieldEnum = exports.OrganizationScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
+exports.defineExtension = exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.ProjectStatusHistoryScalarFieldEnum = exports.ActivityScalarFieldEnum = exports.NoteScalarFieldEnum = exports.TaskAssignmentScalarFieldEnum = exports.TaskScalarFieldEnum = exports.ProjectAddressScalarFieldEnum = exports.ProjectContactScalarFieldEnum = exports.ProjectMemberScalarFieldEnum = exports.ProjectCustomerScalarFieldEnum = exports.ProjectScalarFieldEnum = exports.CustomerAddressScalarFieldEnum = exports.AddressScalarFieldEnum = exports.CustomerNoteScalarFieldEnum = exports.ContactScalarFieldEnum = exports.CustomerScalarFieldEnum = exports.OrganizationMemberScalarFieldEnum = exports.ExternalIdentityScalarFieldEnum = exports.PasswordResetTokenScalarFieldEnum = exports.UserScalarFieldEnum = exports.OrganizationScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/client"));
 /**
  * Prisma Errors
@@ -110,8 +110,8 @@ exports.ModelName = {
     OrganizationMember: 'OrganizationMember',
     Customer: 'Customer',
     Contact: 'Contact',
+    CustomerNote: 'CustomerNote',
     Address: 'Address',
-    CustomerContact: 'CustomerContact',
     CustomerAddress: 'CustomerAddress',
     Project: 'Project',
     ProjectCustomer: 'ProjectCustomer',
@@ -189,12 +189,21 @@ exports.CustomerScalarFieldEnum = {
 exports.ContactScalarFieldEnum = {
     id: 'id',
     organizationId: 'organizationId',
+    customerId: 'customerId',
     fullName: 'fullName',
     email: 'email',
     phone: 'phone',
     jobTitle: 'jobTitle',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
+    archivedAt: 'archivedAt'
+};
+exports.CustomerNoteScalarFieldEnum = {
+    id: 'id',
+    customerId: 'customerId',
+    authorId: 'authorId',
+    content: 'content',
+    createdAt: 'createdAt',
     archivedAt: 'archivedAt'
 };
 exports.AddressScalarFieldEnum = {
@@ -208,15 +217,6 @@ exports.AddressScalarFieldEnum = {
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     archivedAt: 'archivedAt'
-};
-exports.CustomerContactScalarFieldEnum = {
-    id: 'id',
-    customerId: 'customerId',
-    contactId: 'contactId',
-    role: 'role',
-    isPrimary: 'isPrimary',
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
 };
 exports.CustomerAddressScalarFieldEnum = {
     id: 'id',

@@ -41,4 +41,21 @@ export class UsersService {
 
     return membership.organizationId;
   }
+
+  async findAllInOrganization(organizationId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        organizationRoles: {
+          some: { organizationId },
+        },
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+      },
+      orderBy: { displayName: 'asc' },
+    });
+  }
 }

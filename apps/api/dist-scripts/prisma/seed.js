@@ -135,10 +135,7 @@ async function main() {
                     customerNumber: customer.customerNumber,
                 },
             },
-            update: {
-                name: customer.name,
-                description: customer.description,
-            },
+            update: {},
             create: {
                 ...customer,
                 organizationId: organization.id,
