@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { ProjectMemberRole } from '../../../generated/prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ActivitiesService } from '../activities/activities.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import {
@@ -17,6 +18,7 @@ export class ProjectsService {
   constructor(
     private readonly projectsRepository: ProjectsRepository,
     private readonly prisma: PrismaService,
+    private readonly activitiesService: ActivitiesService,
   ) {}
 
   private async assertCustomerExists(
@@ -43,7 +45,11 @@ export class ProjectsService {
     return project;
   }
 
-  async create(organizationId: string, dto: CreateProjectDto) {
+  async create(
+    organizationId: string,
+    actorUserId: string,
+    dto: CreateProjectDto,
+  ) {
     await this.assertCustomerExists(dto.customerId, organizationId);
 
     const existing = await this.projectsRepository.findByProjectNumber(
@@ -54,18 +60,27 @@ export class ProjectsService {
       throw new ConflictException('Project number already exists');
     }
 
-    return this.projectsRepository.create({
+    const project = await this.projectsRepository.create({
       ...dto,
       organizationId,
       startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
       endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
     });
+
+    await this.activitiesService.log({
+      projectId: project.id,
+      actorUserId,
+      type: 'PROJECT_CREATED',
+      message: `Projekt "${project.name}" wurde angelegt`,
+    });
+
+    return project;
   }
 
   async update(
     id: string,
     organizationId: string,
-    changedById: string,
+    actorUserId: string,
     dto: UpdateProjectDto,
   ) {
     const existingProject = await this.findOne(id, organizationId);
@@ -89,21 +104,46 @@ export class ProjectsService {
       endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
     });
 
-    if (dto.status && dto.status !== existingProject.status) {
+    const statusChanged = dto.status && dto.status !== existingProject.status;
+
+    if (statusChanged) {
       await this.projectsRepository.recordStatusChange(
         id,
         existingProject.status,
-        dto.status,
-        changedById,
+        dto.status!,
+        actorUserId,
       );
+
+      await this.activitiesService.log({
+        projectId: id,
+        actorUserId,
+        type: 'PROJECT_STATUS_CHANGED',
+        message: `Status von "${updatedProject.name}" wurde auf ${dto.status} geändert`,
+      });
+    } else {
+      await this.activitiesService.log({
+        projectId: id,
+        actorUserId,
+        type: 'PROJECT_UPDATED',
+        message: `Projekt "${updatedProject.name}" wurde bearbeitet`,
+      });
     }
 
     return updatedProject;
   }
 
-  async archive(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
-    return this.projectsRepository.archive(id);
+  async archive(id: string, organizationId: string, actorUserId: string) {
+    const project = await this.findOne(id, organizationId);
+    const archived = await this.projectsRepository.archive(id);
+
+    await this.activitiesService.log({
+      projectId: id,
+      actorUserId,
+      type: 'PROJECT_ARCHIVED',
+      message: `Projekt "${project.name}" wurde archiviert`,
+    });
+
+    return archived;
   }
 
   async unarchive(id: string, organizationId: string) {

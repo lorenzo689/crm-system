@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ActivitiesService } from '../activities/activities.service';
 import {
   type TaskAssignmentRole,
   TaskStatus,
@@ -17,6 +18,7 @@ export class TasksService {
   constructor(
     private readonly tasksRepository: TasksRepository,
     private readonly prisma: PrismaService,
+    private readonly activitiesService: ActivitiesService,
   ) {}
 
   private async assertProjectExists(
@@ -45,26 +47,53 @@ export class TasksService {
 
   async create(
     organizationId: string,
-    createdByUserId: string,
+    actorUserId: string,
     dto: CreateTaskDto,
   ) {
     await this.assertProjectExists(dto.projectId, organizationId);
 
-    return this.tasksRepository.create({
+    const task = await this.tasksRepository.create({
       ...dto,
       organizationId,
-      createdByUserId,
+      createdByUserId: actorUserId,
       startAt: dto.startAt ? new Date(dto.startAt) : undefined,
       dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
       completedAt:
         dto.status === TaskStatus.COMPLETED ? new Date() : undefined,
     });
+
+    await this.activitiesService.log({
+      taskId: task.id,
+      actorUserId,
+      type: 'TASK_CREATED',
+      message: `Aufgabe "${task.title}" wurde angelegt`,
+    });
+
+    if (dto.status === TaskStatus.COMPLETED) {
+      await this.activitiesService.log({
+        taskId: task.id,
+        actorUserId,
+        type: 'TASK_COMPLETED',
+        message: `Aufgabe "${task.title}" wurde abgeschlossen`,
+      });
+    }
+
+    return task;
   }
 
-  async update(id: string, organizationId: string, dto: UpdateTaskDto) {
+  async update(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+    dto: UpdateTaskDto,
+  ) {
     const existingTask = await this.findOne(id, organizationId);
 
     let completedAt: Date | null | undefined = undefined;
+    const becameCompleted =
+      dto.status === TaskStatus.COMPLETED &&
+      existingTask.status !== TaskStatus.COMPLETED;
+
     if (dto.status && dto.status !== existingTask.status) {
       if (dto.status === TaskStatus.COMPLETED) {
         completedAt = new Date();
@@ -73,33 +102,71 @@ export class TasksService {
       }
     }
 
-    return this.tasksRepository.update(id, {
+    const updatedTask = await this.tasksRepository.update(id, {
       ...dto,
       startAt: dto.startAt ? new Date(dto.startAt) : undefined,
       dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
       ...(completedAt !== undefined && { completedAt }),
     });
+
+    if (becameCompleted) {
+      await this.activitiesService.log({
+        taskId: id,
+        actorUserId,
+        type: 'TASK_COMPLETED',
+        message: `Aufgabe "${updatedTask.title}" wurde abgeschlossen`,
+      });
+    }
+
+    return updatedTask;
   }
 
-  async complete(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
-    return this.tasksRepository.update(id, {
+  async complete(id: string, organizationId: string, actorUserId: string) {
+    const task = await this.findOne(id, organizationId);
+    const updated = await this.tasksRepository.update(id, {
       status: TaskStatus.COMPLETED,
       completedAt: new Date(),
     });
+
+    await this.activitiesService.log({
+      taskId: id,
+      actorUserId,
+      type: 'TASK_COMPLETED',
+      message: `Aufgabe "${task.title}" wurde abgeschlossen`,
+    });
+
+    return updated;
   }
 
-  async cancel(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
-    return this.tasksRepository.update(id, {
+  async cancel(id: string, organizationId: string, actorUserId: string) {
+    const task = await this.findOne(id, organizationId);
+    const updated = await this.tasksRepository.update(id, {
       status: TaskStatus.CANCELLED,
       completedAt: null,
     });
+
+    await this.activitiesService.log({
+      taskId: id,
+      actorUserId,
+      type: 'TASK_CANCELLED',
+      message: `Aufgabe "${task.title}" wurde storniert`,
+    });
+
+    return updated;
   }
 
-  async archive(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
-    return this.tasksRepository.archive(id);
+  async archive(id: string, organizationId: string, actorUserId: string) {
+    const task = await this.findOne(id, organizationId);
+    const archived = await this.tasksRepository.archive(id);
+
+    await this.activitiesService.log({
+      taskId: id,
+      actorUserId,
+      type: 'TASK_ARCHIVED',
+      message: `Aufgabe "${task.title}" wurde archiviert`,
+    });
+
+    return archived;
   }
 
   async unarchive(id: string, organizationId: string) {
@@ -110,6 +177,7 @@ export class TasksService {
   async assignUser(
     taskId: string,
     organizationId: string,
+    actorUserId: string,
     userId: string,
     role: TaskAssignmentRole,
   ) {
@@ -120,7 +188,22 @@ export class TasksService {
       throw new ConflictException('User is already assigned to this task');
     }
 
-    return this.tasksRepository.addAssignment(taskId, userId, role);
+    const assignment = await this.tasksRepository.addAssignment(
+      taskId,
+      userId,
+      role,
+    );
+
+    await this.activitiesService.log({
+      taskId,
+      actorUserId,
+      type: 'TASK_ASSIGNED',
+      message: `${assignment.user.displayName} wurde als ${
+        role === 'RESPONSIBLE' ? 'Verantwortlicher' : 'Mitwirkender'
+      } zugewiesen`,
+    });
+
+    return assignment;
   }
 
   async unassignUser(

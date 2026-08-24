@@ -85,7 +85,7 @@ export class TasksController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.tasksService.update(id, organizationId, dto);
+    return this.tasksService.update(id, organizationId, payload.sub, dto);
   }
 
   @Post(':id/complete')
@@ -94,7 +94,7 @@ export class TasksController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.tasksService.complete(id, organizationId);
+    return this.tasksService.complete(id, organizationId, payload.sub);
   }
 
   @Post(':id/cancel')
@@ -103,7 +103,7 @@ export class TasksController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.tasksService.cancel(id, organizationId);
+    return this.tasksService.cancel(id, organizationId, payload.sub);
   }
 
   @Post(':id/archive')
@@ -112,7 +112,7 @@ export class TasksController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.tasksService.archive(id, organizationId);
+    return this.tasksService.archive(id, organizationId, payload.sub);
   }
 
   @Post(':id/unarchive')
@@ -137,6 +137,7 @@ export class TasksController {
     return this.tasksService.assignUser(
       taskId,
       organizationId,
+      payload.sub,
       dto.userId,
       dto.role,
     );

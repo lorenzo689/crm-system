@@ -6,10 +6,14 @@ import {
 import { CustomersRepository } from './customers.repository';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { ActivitiesService } from '../activities/activities.service';
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly customersRepository: CustomersRepository) {}
+  constructor(
+    private readonly customersRepository: CustomersRepository,
+    private readonly activitiesService: ActivitiesService,
+  ) {}
 
   async findAll(organizationId: string) {
     return this.customersRepository.findAll(organizationId);
@@ -26,7 +30,11 @@ export class CustomersService {
     return customer;
   }
 
-  async create(organizationId: string, dto: CreateCustomerDto) {
+  async create(
+    organizationId: string,
+    actorUserId: string,
+    dto: CreateCustomerDto,
+  ) {
     const existing = await this.customersRepository.findByCustomerNumber(
       dto.customerNumber,
       organizationId,
@@ -35,13 +43,27 @@ export class CustomersService {
       throw new ConflictException('Customer number already exists');
     }
 
-    return this.customersRepository.create({
+    const customer = await this.customersRepository.create({
       ...dto,
       organizationId,
     });
+
+    await this.activitiesService.log({
+      customerId: customer.id,
+      actorUserId,
+      type: 'CUSTOMER_CREATED',
+      message: `Kunde "${customer.name}" wurde angelegt`,
+    });
+
+    return customer;
   }
 
-  async update(id: string, organizationId: string, dto: UpdateCustomerDto) {
+  async update(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+    dto: UpdateCustomerDto,
+  ) {
     await this.findOne(id, organizationId);
 
     if (dto.customerNumber) {
@@ -54,12 +76,30 @@ export class CustomersService {
       }
     }
 
-    return this.customersRepository.update(id, dto);
+    const updated = await this.customersRepository.update(id, dto);
+
+    await this.activitiesService.log({
+      customerId: id,
+      actorUserId,
+      type: 'CUSTOMER_UPDATED',
+      message: `Kunde "${updated.name}" wurde bearbeitet`,
+    });
+
+    return updated;
   }
 
-  async archive(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
-    return this.customersRepository.archive(id);
+  async archive(id: string, organizationId: string, actorUserId: string) {
+    const customer = await this.findOne(id, organizationId);
+    const archived = await this.customersRepository.archive(id);
+
+    await this.activitiesService.log({
+      customerId: id,
+      actorUserId,
+      type: 'CUSTOMER_ARCHIVED',
+      message: `Kunde "${customer.name}" wurde archiviert`,
+    });
+
+    return archived;
   }
 
   async unarchive(id: string, organizationId: string) {

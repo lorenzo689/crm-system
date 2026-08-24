@@ -69,7 +69,7 @@ export class ProjectsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.projectsService.create(organizationId, dto);
+    return this.projectsService.create(organizationId, payload.sub, dto);
   }
 
   @Patch(':id')
@@ -105,7 +105,7 @@ export class ProjectsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.projectsService.archive(id, organizationId);
+    return this.projectsService.archive(id, organizationId, payload.sub);
   }
 
   @Post(':id/unarchive')

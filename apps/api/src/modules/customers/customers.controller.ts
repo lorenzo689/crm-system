@@ -48,7 +48,7 @@ export class CustomersController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.customersService.create(organizationId, dto);
+    return this.customersService.create(organizationId, payload.sub, dto);
   }
 
   @Patch(':id')
@@ -61,7 +61,12 @@ export class CustomersController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.customersService.update(id, organizationId, dto);
+    return this.customersService.update(
+      id,
+      organizationId,
+      payload.sub,
+      dto,
+    );
   }
 
   @Post(':id/archive')
@@ -70,7 +75,7 @@ export class CustomersController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.customersService.archive(id, organizationId);
+    return this.customersService.archive(id, organizationId, payload.sub);
   }
 
   @Post(':id/unarchive')
