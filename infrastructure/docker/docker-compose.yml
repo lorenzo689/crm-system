@@ -18,5 +18,19 @@ services:
       - "8025:8025"
       - "1025:1025"
 
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: bissinger
+      MINIO_ROOT_PASSWORD: bissinger_dev_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
 volumes:
   postgres_data:
+  minio_data:

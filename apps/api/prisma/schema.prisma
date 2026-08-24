@@ -75,17 +75,56 @@ enum ProjectMemberRole {
 enum TaskStatus {
   OPEN
   IN_PROGRESS
+  WAITING
   BLOCKED
-  DONE
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskAssignmentRole {
+  RESPONSIBLE
+  COLLABORATOR
+}
+
+enum NoteType {
+  GENERAL
+  PHONE
+  MEETING
+  INTERNAL
+  DECISION
+}
+
+enum DocumentType {
+  GENERAL
+  OFFER
+  DRAWING
+  PLAN
+  PHOTO
+  SPECIFICATION
+  PROTOCOL
+  OTHER
 }
 
 enum ActivityType {
+  CUSTOMER_CREATED
+  CUSTOMER_UPDATED
+  CUSTOMER_ARCHIVED
   PROJECT_CREATED
-  STATUS_CHANGED
+  PROJECT_UPDATED
+  PROJECT_STATUS_CHANGED
+  PROJECT_ARCHIVED
   TASK_CREATED
-  TASK_UPDATED
-  NOTE_ADDED
-  MEMBER_ADDED
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_CANCELLED
+  TASK_ARCHIVED
+  NOTE_CREATED
 }
 
 model Organization {
@@ -101,27 +140,31 @@ model Organization {
   contacts   Contact[]
   addresses  Address[]
   projects   Project[]
+  tasks      Task[]
+  documents  Document[]
 
   @@map("organizations")
 }
 
 model User {
-  id                    String                 @id @default(uuid()) @db.Uuid
-  email                 String                 @unique
-  displayName           String
-  passwordHash          String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  archivedAt            DateTime?
-  externalIdentities    ExternalIdentity[]
-  organizationRoles     OrganizationMember[]
-  projectMemberships    ProjectMember[]
-  taskAssignments       TaskAssignment[]
-  notesAuthored         Note[]
-  customerNotesAuthored CustomerNote[]         @relation("CustomerNoteAuthor")
-  activitiesLogged      Activity[]             @relation("ActivityActor")
-  statusChanges         ProjectStatusHistory[]
-  passwordResetTokens   PasswordResetToken[]
+  id                       String                 @id @default(uuid()) @db.Uuid
+  email                    String                 @unique
+  displayName              String
+  passwordHash             String?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  archivedAt               DateTime?
+  externalIdentities       ExternalIdentity[]
+  organizationRoles        OrganizationMember[]
+  projectMemberships       ProjectMember[]
+  taskAssignments          TaskAssignment[]
+  tasksCreated             Task[]                 @relation("TaskCreator")
+  notesAuthored            Note[]
+  documentsAuthored        Document[]
+  documentVersionsUploaded DocumentVersion[]
+  activitiesLogged         Activity[]             @relation("ActivityActor")
+  statusChanges            ProjectStatusHistory[]
+  passwordResetTokens      PasswordResetToken[]
 
   @@map("users")
 }
@@ -179,7 +222,9 @@ model Customer {
   archivedAt     DateTime?
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   contacts       Contact[]
-  notes          CustomerNote[]
+  notesGeneric   Note[]
+  activities     Activity[]
+  documents      Document[]
   addresses      CustomerAddress[]
   projects       Project[]
 
@@ -208,21 +253,6 @@ model Contact {
   @@index([organizationId, fullName])
   @@index([organizationId, archivedAt])
   @@map("contacts")
-}
-
-model CustomerNote {
-  id         String    @id @default(uuid()) @db.Uuid
-  customerId String    @db.Uuid
-  authorId   String    @db.Uuid
-  content    String
-  createdAt  DateTime  @default(now())
-  archivedAt DateTime?
-  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  author     User      @relation("CustomerNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
-
-  @@index([customerId, createdAt])
-  @@index([customerId, archivedAt])
-  @@map("customer_notes")
 }
 
 model Address {
@@ -282,6 +312,7 @@ model Project {
   tasks          Task[]
   notes          Note[]
   activities     Activity[]
+  documents      Document[]
   statusHistory  ProjectStatusHistory[]
 
   @@unique([organizationId, projectNumber])
@@ -334,32 +365,42 @@ model ProjectAddress {
 }
 
 model Task {
-  id          String           @id @default(uuid()) @db.Uuid
-  projectId   String           @db.Uuid
-  title       String
-  description String?
-  status      TaskStatus       @default(OPEN)
-  dueAt       DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  archivedAt  DateTime?
-  project     Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  assignments TaskAssignment[]
-  notes       Note[]
-  activities  Activity[]
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @db.Uuid
+  projectId       String           @db.Uuid
+  createdByUserId String           @db.Uuid
+  title           String
+  description     String?
+  status          TaskStatus       @default(OPEN)
+  priority        TaskPriority     @default(MEDIUM)
+  statusNote      String?
+  startAt         DateTime?
+  dueAt           DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  archivedAt      DateTime?
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  createdBy       User             @relation("TaskCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  assignments     TaskAssignment[]
+  notes           Note[]
+  activities      Activity[]
 
+  @@index([organizationId, status])
   @@index([projectId, status])
   @@index([projectId, archivedAt])
   @@map("tasks")
 }
 
 model TaskAssignment {
-  id         String   @id @default(uuid()) @db.Uuid
-  taskId     String   @db.Uuid
-  userId     String   @db.Uuid
-  assignedAt DateTime @default(now())
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  id         String             @id @default(uuid()) @db.Uuid
+  taskId     String             @db.Uuid
+  userId     String             @db.Uuid
+  role       TaskAssignmentRole @default(RESPONSIBLE)
+  assignedAt DateTime           @default(now())
+  task       Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User               @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([taskId, userId])
   @@map("task_assignments")
@@ -367,36 +408,90 @@ model TaskAssignment {
 
 model Note {
   id         String    @id @default(uuid()) @db.Uuid
-  projectId  String    @db.Uuid
+  customerId String?   @db.Uuid
+  projectId  String?   @db.Uuid
   taskId     String?   @db.Uuid
   authorId   String    @db.Uuid
+  type       NoteType  @default(GENERAL)
+  title      String?
   content    String
   createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   archivedAt DateTime?
-  project    Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Restrict)
   task       Task?     @relation(fields: [taskId], references: [id], onDelete: Restrict)
   author     User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
 
+  @@index([customerId, createdAt])
   @@index([projectId, createdAt])
-  @@index([taskId])
+  @@index([taskId, createdAt])
+  @@index([customerId, archivedAt])
   @@index([projectId, archivedAt])
   @@map("notes")
 }
 
+model Document {
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @db.Uuid
+  customerId       String?           @db.Uuid
+  projectId        String?           @db.Uuid
+  authorId         String            @db.Uuid
+  title            String
+  type             DocumentType      @default(GENERAL)
+  currentVersionId String?           @unique @db.Uuid
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  archivedAt       DateTime?
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project          Project?          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  author           User              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  currentVersion   DocumentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions         DocumentVersion[] @relation("DocumentVersions")
+
+  @@index([organizationId, customerId])
+  @@index([organizationId, projectId])
+  @@index([organizationId, archivedAt])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  documentId    String    @db.Uuid
+  versionNumber Int
+  storageKey    String
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  uploadedById  String    @db.Uuid
+  createdAt     DateTime  @default(now())
+  document      Document  @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy    User      @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  currentFor    Document? @relation("CurrentVersion")
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@map("document_versions")
+}
+
 model Activity {
   id          String       @id @default(uuid()) @db.Uuid
-  projectId   String       @db.Uuid
+  customerId  String?      @db.Uuid
+  projectId   String?      @db.Uuid
   taskId      String?      @db.Uuid
   actorUserId String?      @db.Uuid
   type        ActivityType
   message     String
   occurredAt  DateTime     @default(now())
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
   task        Task?        @relation(fields: [taskId], references: [id], onDelete: Restrict)
   actor       User?        @relation("ActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
+  @@index([customerId, occurredAt])
   @@index([projectId, occurredAt])
-  @@index([taskId])
+  @@index([taskId, occurredAt])
   @@map("activities")
 }
 

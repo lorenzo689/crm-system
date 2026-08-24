@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/auth-api";
+import { ActivityTimeline } from "@/components/activity-timeline";
+import { NotesSection } from "@/components/notes-section";
 import {
   priorityLabels,
   statusLabels,
@@ -18,6 +20,7 @@ import {
   ProjectTeam,
   type ProjectMember,
 } from "../_components/project-team";
+import { ProjectTasks } from "../_components/project-tasks";
 
 type Project = {
   id: string;
@@ -36,11 +39,14 @@ type Project = {
 };
 
 type ProjectMutationResponse = Omit<Project, "customer" | "members">;
-type Tab = "overview" | "team";
+type Tab = "overview" | "team" | "tasks" | "notes" | "activities";
 
 const tabs: { key: Tab; label: string }[] = [
   { key: "overview", label: "Übersicht" },
   { key: "team", label: "Team" },
+  { key: "tasks", label: "Aufgaben" },
+  { key: "notes", label: "Notizen" },
+  { key: "activities", label: "Aktivitaeten" },
 ];
 
 export default function ProjectDetailPage() {
@@ -256,6 +262,20 @@ export default function ProjectDetailPage() {
             )
           }
         />
+      )}
+
+      {activeTab === "tasks" && (
+        <ProjectTasks projectId={project.id} projectName={project.name} />
+      )}
+
+      {activeTab === "notes" && (
+        <NotesSection contextParam="projectId" contextId={project.id} />
+      )}
+
+      {activeTab === "activities" && (
+        <div className="max-w-2xl">
+          <ActivityTimeline contextParam="projectId" contextId={project.id} />
+        </div>
       )}
 
       <ProjectFormModal

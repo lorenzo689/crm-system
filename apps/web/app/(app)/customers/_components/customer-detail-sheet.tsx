@@ -1,7 +1,8 @@
 "use client";
 
 import { ContactList } from "./contact-list";
-import { NoteList } from "./note-list";
+import { ActivityTimeline } from "@/components/activity-timeline";
+import { NotesSection } from "@/components/notes-section";
 import type { Customer } from "./customer-types";
 import { statusLabels, statusStyles } from "./customer-types";
 
@@ -122,7 +123,20 @@ export function CustomerDetailSheet({
           </section>
 
           <ContactList customerId={customer.id} isOpen={isOpen} />
-          <NoteList customerId={customer.id} isOpen={isOpen} />
+          <NotesSection
+            contextParam="customerId"
+            contextId={customer.id}
+            isOpen={isOpen}
+          />
+          <section>
+            <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-zinc-400">
+              Aktivitaeten
+            </p>
+            <ActivityTimeline
+              contextParam="customerId"
+              contextId={customer.id}
+            />
+          </section>
         </div>
 
         <div className="mt-auto border-t border-zinc-200 px-6 py-5">
