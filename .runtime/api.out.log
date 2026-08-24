@@ -1,0 +1,56 @@
+[2J[3J[H[[90m18:42:03[0m] Starting compilation in watch mode...
+
+[[90m18:42:15[0m] Found 0 errors. Watching for file changes.
+
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [NestFactory] Starting Nest application...
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] PrismaModule dependencies initialized +40ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] ThrottlerModule dependencies initialized +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] JwtModule dependencies initialized +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] AppModule dependencies initialized +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] HealthModule dependencies initialized +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] AuthModule dependencies initialized +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] UsersModule dependencies initialized +2ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] CustomersModule dependencies initialized +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] ContactsModule dependencies initialized +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] CustomerNotesModule dependencies initialized +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [InstanceLoader] ProjectsModule dependencies initialized +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RoutesResolver] HealthController {/api/v1/health}: +11ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/health, GET} route +6ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RoutesResolver] AuthController {/api/v1/auth}: +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/auth/register, POST} route +2ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/auth/login, POST} route +2ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/auth/forgot-password, POST} route +2ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/auth/reset-password, POST} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RoutesResolver] UsersController {/api/v1}: +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/me, GET} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/users, GET} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RoutesResolver] CustomersController {/api/v1/customers}: +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customers, GET} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customers/:id, GET} route +2ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customers, POST} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customers/:id, PATCH} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customers/:id/archive, POST} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customers/:id/unarchive, POST} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RoutesResolver] ContactsController {/api/v1/contacts}: +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/contacts, GET} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/contacts/:id, GET} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/contacts, POST} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/contacts/:id, PATCH} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/contacts/:id/archive, POST} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/contacts/:id/unarchive, POST} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RoutesResolver] CustomerNotesController {/api/v1/customer-notes}: +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customer-notes, GET} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customer-notes, POST} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/customer-notes/:id/archive, POST} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RoutesResolver] ProjectsController {/api/v1/projects}: +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects, GET} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id, GET} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects, POST} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id, PATCH} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id/status-history, GET} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id/archive, POST} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id/unarchive, POST} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id/members, POST} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id/members/:userId, PATCH} route +1ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [RouterExplorer] Mapped {/api/v1/projects/:id/members/:userId, DELETE} route +0ms
+[Nest] 19468  - 24.08.2026, 18:42:19     LOG [NestApplication] Nest application successfully started +153ms
