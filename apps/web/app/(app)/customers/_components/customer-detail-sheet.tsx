@@ -2,6 +2,7 @@
 
 import { ContactList } from "./contact-list";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { DocumentsSection } from "@/components/documents-section";
 import { NotesSection } from "@/components/notes-section";
 import type { Customer } from "./customer-types";
 import { statusLabels, statusStyles } from "./customer-types";
@@ -133,6 +134,15 @@ export function CustomerDetailSheet({
               Aktivitaeten
             </p>
             <ActivityTimeline
+              contextParam="customerId"
+              contextId={customer.id}
+            />
+          </section>
+          <section>
+            <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-zinc-400">
+              Dokumente
+            </p>
+            <DocumentsSection
               contextParam="customerId"
               contextId={customer.id}
             />

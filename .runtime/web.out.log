@@ -94,3 +94,8 @@ Creating turbopack project {
  GET /calendar 404 in 143ms (next.js: 18ms, application-code: 125ms)
  GET /documents 404 in 172ms (next.js: 16ms, application-code: 155ms)
  GET /documents 404 in 110ms (next.js: 19ms, application-code: 92ms)
+ GET /customers 200 in 100ms (next.js: 13ms, application-code: 87ms)
+ GET /documents 404 in 57ms (next.js: 17ms, application-code: 41ms)
+ GET /documents 404 in 99ms (next.js: 19ms, application-code: 80ms)
+ GET /tasks 200 in 54ms (next.js: 10ms, application-code: 44ms)
+ GET /tasks 200 in 98ms (next.js: 15ms, application-code: 82ms)

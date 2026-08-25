@@ -88,7 +88,7 @@ export class DocumentsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.documentsService.archive(id, organizationId);
+    return this.documentsService.archive(id, organizationId, payload.sub);
   }
 
   @Post(':id/versions')

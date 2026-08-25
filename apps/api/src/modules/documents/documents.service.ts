@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { STORAGE_SERVICE } from '../../common/storage/storage.interface';
 import type { StorageService } from '../../common/storage/storage.interface';
+import { ActivitiesService } from '../activities/activities.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import {
@@ -27,12 +28,22 @@ const ALLOWED_MIME_TYPES = [
   'image/vnd.dwg',
 ];
 
+function resolveActivityContext(document: {
+  customerId: string | null;
+  projectId: string | null;
+}) {
+  if (document.projectId) return { projectId: document.projectId };
+  if (document.customerId) return { customerId: document.customerId };
+  return {};
+}
+
 @Injectable()
 export class DocumentsService {
   constructor(
     private readonly documentsRepository: DocumentsRepository,
     private readonly prisma: PrismaService,
     @Inject(STORAGE_SERVICE) private readonly storageService: StorageService,
+    private readonly activitiesService: ActivitiesService,
   ) {}
 
   private async assertValidContext(
@@ -95,11 +106,20 @@ export class DocumentsService {
   ) {
     await this.assertValidContext(organizationId, dto);
 
-    return this.documentsRepository.create({
+    const document = await this.documentsRepository.create({
       ...dto,
       organizationId,
       authorId,
     });
+
+    await this.activitiesService.log({
+      ...resolveActivityContext(document),
+      actorUserId: authorId,
+      type: 'DOCUMENT_CREATED',
+      message: `Dokument "${document.title}" wurde angelegt`,
+    });
+
+    return document;
   }
 
   async update(id: string, organizationId: string, dto: UpdateDocumentDto) {
@@ -107,9 +127,18 @@ export class DocumentsService {
     return this.documentsRepository.update(id, dto);
   }
 
-  async archive(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
-    return this.documentsRepository.archive(id);
+  async archive(id: string, organizationId: string, actorUserId: string) {
+    const document = await this.findOne(id, organizationId);
+    const archived = await this.documentsRepository.archive(id);
+
+    await this.activitiesService.log({
+      ...resolveActivityContext(document),
+      actorUserId,
+      type: 'DOCUMENT_ARCHIVED',
+      message: `Dokument "${document.title}" wurde archiviert`,
+    });
+
+    return archived;
   }
 
   async uploadVersion(
@@ -123,7 +152,7 @@ export class DocumentsService {
       size: number;
     },
   ) {
-    await this.findOne(documentId, organizationId);
+    const document = await this.findOne(documentId, organizationId);
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
       throw new BadRequestException(
@@ -159,7 +188,16 @@ export class DocumentsService {
 
     await this.documentsRepository.setCurrentVersion(documentId, version.id);
 
-    return this.findOne(documentId, organizationId);
+    const result = await this.findOne(documentId, organizationId);
+
+    await this.activitiesService.log({
+      ...resolveActivityContext(document),
+      actorUserId: uploadedById,
+      type: 'DOCUMENT_VERSION_ADDED',
+      message: `Neue Version von "${document.title}" hochgeladen (v${versionNumber})`,
+    });
+
+    return result;
   }
 
   async getDownloadUrl(documentId: string, organizationId: string) {

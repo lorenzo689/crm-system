@@ -6,6 +6,7 @@ import { ActivitiesModule } from './modules/activities/activities.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -25,6 +26,7 @@ import { UsersModule } from './modules/users/users.module';
     NotesModule,
     ProjectsModule,
     TasksModule,
+    DocumentsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

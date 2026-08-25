@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/auth-api";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { DocumentsSection } from "@/components/documents-section";
 import { NotesSection } from "@/components/notes-section";
 import {
   priorityLabels,
@@ -39,7 +40,13 @@ type Project = {
 };
 
 type ProjectMutationResponse = Omit<Project, "customer" | "members">;
-type Tab = "overview" | "team" | "tasks" | "notes" | "activities";
+type Tab =
+  | "overview"
+  | "team"
+  | "tasks"
+  | "notes"
+  | "activities"
+  | "documents";
 
 const tabs: { key: Tab; label: string }[] = [
   { key: "overview", label: "Übersicht" },
@@ -47,6 +54,7 @@ const tabs: { key: Tab; label: string }[] = [
   { key: "tasks", label: "Aufgaben" },
   { key: "notes", label: "Notizen" },
   { key: "activities", label: "Aktivitaeten" },
+  { key: "documents", label: "Dokumente" },
 ];
 
 export default function ProjectDetailPage() {
@@ -275,6 +283,12 @@ export default function ProjectDetailPage() {
       {activeTab === "activities" && (
         <div className="max-w-2xl">
           <ActivityTimeline contextParam="projectId" contextId={project.id} />
+        </div>
+      )}
+
+      {activeTab === "documents" && (
+        <div className="max-w-2xl">
+          <DocumentsSection contextParam="projectId" contextId={project.id} />
         </div>
       )}
 
