@@ -147,11 +147,21 @@ export default function CalendarPage() {
   const [customerFilter, setCustomerFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [view, setView] = useState<CalendarView>("agenda");
+  const [view, setView] = useState<CalendarView | null>(null);
   const [visibleMonth, setVisibleMonth] = useState<VisibleMonth>(() => {
     const today = new Date();
     return { year: today.getFullYear(), month: today.getMonth() };
   });
+
+  useEffect(() => {
+    apiFetch<{ calendarDefaultView: "AGENDA" | "MONTH" }>("/settings")
+      .then((settings) => {
+        setView(
+          settings.calendarDefaultView === "MONTH" ? "month" : "agenda",
+        );
+      })
+      .catch(() => setView("agenda"));
+  }, []);
 
   useEffect(() => {
     const { from, to } = getAgendaRange();
@@ -280,6 +290,10 @@ export default function CalendarPage() {
 
   if (error) {
     return <p className="p-6 text-sm text-red-600 sm:p-8">{error}</p>;
+  }
+
+  if (view === null) {
+    return <p className="p-8 text-sm text-zinc-400">Lädt…</p>;
   }
 
   const groups = groupByDay(filteredEvents);

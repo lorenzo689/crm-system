@@ -146,6 +146,35 @@ enum ReminderStatus {
   FAILED
 }
 
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum Density {
+  COMPACT
+  COMFORTABLE
+}
+
+enum TaskView {
+  LIST
+  KANBAN
+}
+
+enum CalendarViewSetting {
+  AGENDA
+  MONTH
+  WEEK
+}
+
+enum LandingPage {
+  DASHBOARD
+  TASKS
+  CALENDAR
+  PROJECTS
+}
+
 model Organization {
   id             String               @id @default(uuid()) @db.Uuid
   name           String
@@ -188,8 +217,29 @@ model User {
   calendarEventsCreated    CalendarEvent[]
   reminders                Reminder[]
   notifications            Notification[]
+  userSetting              UserSetting?
 
   @@map("users")
+}
+
+model UserSetting {
+  id                   String              @id @default(uuid()) @db.Uuid
+  userId               String              @unique @db.Uuid
+  theme                Theme               @default(SYSTEM)
+  density              Density             @default(COMFORTABLE)
+  defaultTaskView      TaskView            @default(LIST)
+  showCompletedTasks   Boolean             @default(true)
+  calendarDefaultView  CalendarViewSetting @default(AGENDA)
+  defaultLandingPage   LandingPage         @default(DASHBOARD)
+  notificationsEnabled Boolean             @default(true)
+  taskReminders        Boolean             @default(true)
+  calendarReminders    Boolean             @default(true)
+  overdueTaskAlerts    Boolean             @default(true)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
 }
 
 model PasswordResetToken {

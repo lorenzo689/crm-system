@@ -47,6 +47,28 @@ export class RemindersSchedulerService {
     calendarEvent: { id: string; title: string; startsAt: Date },
   ) {
     try {
+      const userSettings = await this.prisma.userSetting.findUnique({
+        where: { userId },
+        select: { notificationsEnabled: true, calendarReminders: true },
+      });
+
+      const notificationsAllowed =
+        (userSettings?.notificationsEnabled ?? true) &&
+        (userSettings?.calendarReminders ?? true);
+
+      if (!notificationsAllowed) {
+        const claimed = await this.prisma.reminder.updateMany({
+          where: { id: reminderId, status: 'PENDING' },
+          data: { status: 'CANCELLED' },
+        });
+        if (claimed.count > 0) {
+          this.logger.log(
+            `Reminder ${reminderId} cancelled: notifications disabled for user`,
+          );
+        }
+        return;
+      }
+
       const claimed = await this.prisma.reminder.updateMany({
         where: { id: reminderId, status: 'PENDING' },
         data: { status: 'SENT', sentAt: new Date() },

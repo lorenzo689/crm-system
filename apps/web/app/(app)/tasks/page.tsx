@@ -63,6 +63,7 @@ export default function TasksPage() {
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
   const [archiveFilter, setArchiveFilter] =
     useState<ArchiveFilter>("active");
+  const [hideCompleted, setHideCompleted] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
@@ -71,11 +72,15 @@ export default function TasksPage() {
       apiFetch<Task[]>("/tasks"),
       apiFetch<ProjectOption[]>("/projects"),
       apiFetch<UserOption[]>("/users"),
+      apiFetch<{ showCompletedTasks: boolean }>("/settings").catch(() => ({
+        showCompletedTasks: true,
+      })),
     ])
-      .then(([loadedTasks, loadedProjects, loadedUsers]) => {
+      .then(([loadedTasks, loadedProjects, loadedUsers, settings]) => {
         setTasks(loadedTasks);
         setProjects(loadedProjects);
         setUsers(loadedUsers);
+        setHideCompleted(!settings.showCompletedTasks);
       })
       .catch((caughtError: unknown) =>
         setError(
@@ -98,6 +103,13 @@ export default function TasksPage() {
 
     if (statusFilter !== "all") {
       result = result.filter((task) => task.status === statusFilter);
+    }
+
+    if (hideCompleted) {
+      result = result.filter(
+        (task) =>
+          task.status !== "COMPLETED" && task.status !== "CANCELLED",
+      );
     }
 
     if (priorityFilter !== "all") {
@@ -161,6 +173,7 @@ export default function TasksPage() {
     archiveFilter,
     assigneeFilter,
     dueFilter,
+    hideCompleted,
     priorityFilter,
     projectFilter,
     searchQuery,

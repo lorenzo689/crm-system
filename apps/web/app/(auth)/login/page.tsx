@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
-import { login as loginRequest } from "@/lib/auth-api";
+import { apiFetch, login as loginRequest } from "@/lib/auth-api";
 import { consumeSessionNotice, storeAccessToken } from "@/lib/session";
 
 function BrandMark() {
@@ -50,7 +50,24 @@ export default function LoginPage() {
     try {
       const { accessToken } = await loginRequest({ email, password });
       storeAccessToken(accessToken);
-      router.push("/dashboard");
+
+      const landingRoutes: Record<string, string> = {
+        DASHBOARD: "/dashboard",
+        TASKS: "/tasks",
+        CALENDAR: "/calendar",
+        PROJECTS: "/projects",
+      };
+
+      try {
+        const settings = await apiFetch<{ defaultLandingPage: string }>(
+          "/settings",
+        );
+        router.push(
+          landingRoutes[settings.defaultLandingPage] ?? "/dashboard",
+        );
+      } catch {
+        router.push("/dashboard");
+      }
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
