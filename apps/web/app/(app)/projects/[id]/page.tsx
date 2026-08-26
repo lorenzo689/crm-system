@@ -13,6 +13,7 @@ import {
   type ProjectPriority,
   type ProjectStatus,
 } from "../_components/project-constants";
+import { CalendarEventsSection } from "../_components/calendar-events-section";
 import {
   ProjectFormModal,
   type CustomerOption,
@@ -46,15 +47,17 @@ type Tab =
   | "tasks"
   | "notes"
   | "activities"
-  | "documents";
+  | "documents"
+  | "calendar";
 
 const tabs: { key: Tab; label: string }[] = [
   { key: "overview", label: "Übersicht" },
   { key: "team", label: "Team" },
   { key: "tasks", label: "Aufgaben" },
   { key: "notes", label: "Notizen" },
-  { key: "activities", label: "Aktivitaeten" },
+  { key: "activities", label: "Aktivitäten" },
   { key: "documents", label: "Dokumente" },
+  { key: "calendar", label: "Termine" },
 ];
 
 export default function ProjectDetailPage() {
@@ -289,6 +292,12 @@ export default function ProjectDetailPage() {
       {activeTab === "documents" && (
         <div className="max-w-2xl">
           <DocumentsSection contextParam="projectId" contextId={project.id} />
+        </div>
+      )}
+
+      {activeTab === "calendar" && (
+        <div className="max-w-2xl">
+          <CalendarEventsSection projectId={project.id} />
         </div>
       )}
 

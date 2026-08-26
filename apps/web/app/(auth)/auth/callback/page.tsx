@@ -6,13 +6,13 @@ export default function AuthCallbackPage() {
     <AuthShell
       eyebrow="Authentifizierung"
       title="Anmeldung wird verarbeitet"
-      description="Die Rueckmeldung des Identity-Providers wird hier spaeter verarbeitet. Diese Seite ist aktuell nur als technischer Platzhalter vorhanden."
+      description="Die Rückmeldung des Identity-Providers wird hier später verarbeitet. Diese Seite ist aktuell nur als technischer Platzhalter vorhanden."
     >
       <div className="space-y-6">
         <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] p-5">
           <p className="text-sm leading-6 text-[var(--color-muted)]">
-            In der finalen Version validieren wir hier das Rueckgabe-Token,
-            pruefen Benutzer- und Organisationsstatus und erzeugen danach die
+            In der finalen Version validieren wir hier das Rückgabe-Token,
+            prüfen Benutzer- und Organisationsstatus und erzeugen danach die
             interne Session.
           </p>
         </div>
@@ -28,7 +28,7 @@ export default function AuthCallbackPage() {
           href="/login"
           className="inline-flex rounded-full border border-[var(--color-line)] px-5 py-3 text-sm font-semibold text-[var(--color-ink)] transition hover:bg-[var(--color-paper-strong)]"
         >
-          Zurueck zum Login
+          Zurück zum Login
         </Link>
       </div>
     </AuthShell>

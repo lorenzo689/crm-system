@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { FaBell, FaSearch } from "react-icons/fa";
+import { FaSearch } from "react-icons/fa";
+import { NotificationsBell } from "@/components/notifications-bell";
 import { logout } from "@/lib/session";
 
 export function AppHeader() {
@@ -73,16 +74,7 @@ export function AppHeader() {
           Abmelden
         </button>
 
-        <button
-          type="button"
-          aria-label="3 neue Benachrichtigungen"
-          className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-900 transition-colors duration-150 hover:bg-zinc-50"
-        >
-          <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[0.62rem] font-semibold text-white">
-            3
-          </span>
-          <FaBell className="text-base" />
-        </button>
+        <NotificationsBell />
 
         <button
           type="button"

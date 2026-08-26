@@ -128,12 +128,22 @@ enum ActivityType {
   DOCUMENT_CREATED
   DOCUMENT_VERSION_ADDED
   DOCUMENT_ARCHIVED
+  CALENDAR_EVENT_CREATED
+  CALENDAR_EVENT_UPDATED
+  CALENDAR_EVENT_CANCELLED
 }
 
 enum CalendarEventStatus {
   SCHEDULED
   COMPLETED
   CANCELLED
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  CANCELLED
+  FAILED
 }
 
 model Organization {
@@ -176,6 +186,8 @@ model User {
   statusChanges            ProjectStatusHistory[]
   passwordResetTokens      PasswordResetToken[]
   calendarEventsCreated    CalendarEvent[]
+  reminders                Reminder[]
+  notifications            Notification[]
 
   @@map("users")
 }
@@ -542,10 +554,45 @@ model CalendarEvent {
   createdBy       User                @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
   customer        Customer?           @relation(fields: [customerId], references: [id], onDelete: Restrict)
   project         Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  reminders       Reminder[]
 
   @@index([organizationId, startsAt])
   @@index([customerId, startsAt])
   @@index([projectId, startsAt])
   @@index([organizationId, archivedAt])
   @@map("calendar_events")
+}
+
+model Reminder {
+  id              String         @id @default(uuid()) @db.Uuid
+  calendarEventId String         @db.Uuid
+  userId          String         @db.Uuid
+  remindAt        DateTime
+  status          ReminderStatus @default(PENDING)
+  sentAt          DateTime?
+  createdAt       DateTime       @default(now())
+  calendarEvent   CalendarEvent  @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification    Notification?
+
+  @@index([status, remindAt])
+  @@index([calendarEventId])
+  @@map("reminders")
+}
+
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  type       String
+  title      String
+  message    String
+  readAt     DateTime?
+  reminderId String?   @unique @db.Uuid
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminder   Reminder? @relation(fields: [reminderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

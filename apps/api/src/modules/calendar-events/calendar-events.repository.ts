@@ -83,4 +83,28 @@ export class CalendarEventsRepository {
       data: { archivedAt: new Date() },
     });
   }
+
+  async addReminder(calendarEventId: string, userId: string, remindAt: Date) {
+    return this.prisma.reminder.create({
+      data: { calendarEventId, userId, remindAt },
+    });
+  }
+
+  async findReminders(calendarEventId: string, userId: string) {
+    return this.prisma.reminder.findMany({
+      where: { calendarEventId, userId },
+      orderBy: { remindAt: 'asc' },
+    });
+  }
+
+  async findReminderById(id: string) {
+    return this.prisma.reminder.findUnique({ where: { id } });
+  }
+
+  async cancelReminder(id: string) {
+    return this.prisma.reminder.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+  }
 }

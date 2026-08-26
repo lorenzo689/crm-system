@@ -40,6 +40,14 @@ type CalendarEventFormModalProps = {
   onSaved: (event: CalendarEvent) => void;
 };
 
+type ReminderPreset =
+  | "none"
+  | "10min"
+  | "30min"
+  | "1hour"
+  | "1day"
+  | "custom";
+
 type FormState = {
   customerId: string;
   projectId: string;
@@ -87,6 +95,9 @@ export function CalendarEventFormModal({
   );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reminderPreset, setReminderPreset] =
+    useState<ReminderPreset>("none");
+  const [customReminderAt, setCustomReminderAt] = useState("");
 
   const availableProjects = formState.customerId
     ? projects.filter(
@@ -114,6 +125,30 @@ export function CalendarEventFormModal({
     });
   }
 
+  function calculateReminderTime(
+    preset: ReminderPreset,
+    startsAt: string,
+  ): string | null {
+    if (preset === "none") return null;
+    if (preset === "custom") return customReminderAt || null;
+
+    const start = new Date(startsAt);
+    const offsetMinutes: Record<
+      Exclude<ReminderPreset, "none" | "custom">,
+      number
+    > = {
+      "10min": 10,
+      "30min": 30,
+      "1hour": 60,
+      "1day": 60 * 24,
+    };
+
+    const reminderTime = new Date(
+      start.getTime() - offsetMinutes[preset] * 60000,
+    );
+    return reminderTime.toISOString();
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -133,6 +168,28 @@ export function CalendarEventFormModal({
           allDay: formState.allDay,
         }),
       });
+
+      const reminderTime = calculateReminderTime(
+        reminderPreset,
+        formState.startsAt,
+      );
+      if (reminderTime) {
+        try {
+          await apiFetch(`/calendar-events/${savedEvent.id}/reminders`, {
+            method: "POST",
+            body: JSON.stringify({ remindAt: reminderTime }),
+          });
+        } catch (reminderError) {
+          setError(
+            "Termin wurde erstellt, die Erinnerung konnte aber nicht gesetzt werden: " +
+              (reminderError instanceof Error
+                ? reminderError.message
+                : "Unbekannter Fehler"),
+          );
+          onSaved(savedEvent);
+          return;
+        }
+      }
 
       onSaved(savedEvent);
       onClose();
@@ -250,6 +307,35 @@ export function CalendarEventFormModal({
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-600">
+              Erinnerung
+            </label>
+            <select
+              value={reminderPreset}
+              onChange={(event) =>
+                setReminderPreset(event.target.value as ReminderPreset)
+              }
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none"
+            >
+              <option value="none">Keine Erinnerung</option>
+              <option value="10min">10 Minuten vorher</option>
+              <option value="30min">30 Minuten vorher</option>
+              <option value="1hour">1 Stunde vorher</option>
+              <option value="1day">1 Tag vorher</option>
+              <option value="custom">Benutzerdefiniert</option>
+            </select>
+
+            {reminderPreset === "custom" && (
+              <input
+                type="datetime-local"
+                value={customReminderAt}
+                onChange={(event) => setCustomReminderAt(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none"
+              />
+            )}
           </div>
 
           <label className="flex items-center gap-2 text-sm text-zinc-600">

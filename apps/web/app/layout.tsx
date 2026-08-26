@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Bissinger OS',
-  description: 'Interne Plattform fuer Kunden, Projekte und Aufgaben.',
+  description: 'Interne Plattform für Kunden, Projekte und Aufgaben.',
 };
 
 export default function RootLayout({

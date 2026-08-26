@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { StorageModule } from './common/storage/storage.module';
 import { ActivitiesModule } from './modules/activities/activities.module';
@@ -10,12 +11,14 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotesModule } from './modules/notes/notes.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     StorageModule,
     HealthModule,
@@ -26,6 +29,7 @@ import { UsersModule } from './modules/users/users.module';
     CustomersModule,
     ContactsModule,
     NotesModule,
+    NotificationsModule,
     ProjectsModule,
     TasksModule,
     DocumentsModule,

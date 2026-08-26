@@ -16,6 +16,7 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import { CalendarEventsService } from './calendar-events.service';
 import { CreateCalendarEventDto } from './dto/create-calendar-event.dto';
+import { CreateReminderDto } from './dto/create-reminder.dto';
 import { UpdateCalendarEventDto } from './dto/update-calendar-event.dto';
 
 @UseGuards(JwtAuthGuard)
@@ -63,11 +64,7 @@ export class CalendarEventsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.calendarEventsService.create(
-      organizationId,
-      payload.sub,
-      dto,
-    );
+    return this.calendarEventsService.create(organizationId, payload.sub, dto);
   }
 
   @Patch(':id')
@@ -80,7 +77,12 @@ export class CalendarEventsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.calendarEventsService.update(id, organizationId, dto);
+    return this.calendarEventsService.update(
+      id,
+      organizationId,
+      payload.sub,
+      dto,
+    );
   }
 
   @Post(':id/cancel')
@@ -89,7 +91,7 @@ export class CalendarEventsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.calendarEventsService.cancel(id, organizationId);
+    return this.calendarEventsService.cancel(id, organizationId, payload.sub);
   }
 
   @Post(':id/archive')
@@ -99,5 +101,45 @@ export class CalendarEventsController {
       payload.sub,
     );
     return this.calendarEventsService.archive(id, organizationId);
+  }
+
+  @Post(':id/reminders')
+  async addReminder(
+    @Param('id') id: string,
+    @Body() dto: CreateReminderDto,
+    @Req() req: Request,
+  ) {
+    const payload = req.user as JwtPayload;
+    const organizationId = await this.usersService.getOrganizationId(
+      payload.sub,
+    );
+    return this.calendarEventsService.addReminder(
+      id,
+      organizationId,
+      payload.sub,
+      dto.remindAt,
+    );
+  }
+
+  @Get(':id/reminders')
+  async findReminders(@Param('id') id: string, @Req() req: Request) {
+    const payload = req.user as JwtPayload;
+    const organizationId = await this.usersService.getOrganizationId(
+      payload.sub,
+    );
+    return this.calendarEventsService.findReminders(
+      id,
+      organizationId,
+      payload.sub,
+    );
+  }
+
+  @Post('reminders/:reminderId/cancel')
+  async cancelReminder(
+    @Param('reminderId') reminderId: string,
+    @Req() req: Request,
+  ) {
+    const payload = req.user as JwtPayload;
+    return this.calendarEventsService.cancelReminder(reminderId, payload.sub);
   }
 }

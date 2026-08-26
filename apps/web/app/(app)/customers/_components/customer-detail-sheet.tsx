@@ -131,7 +131,7 @@ export function CustomerDetailSheet({
           />
           <section>
             <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-zinc-400">
-              Aktivitaeten
+              Aktivitäten
             </p>
             <ActivityTimeline
               contextParam="customerId"

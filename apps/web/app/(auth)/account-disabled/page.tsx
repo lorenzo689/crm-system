@@ -38,7 +38,7 @@ export default function AccountDisabledPage() {
               <p className="text-sm leading-7 text-slate-500 sm:text-base">
                 Ihr Benutzerkonto oder Ihre Organisationszuordnung ist derzeit
                 nicht aktiv. Bitte wenden Sie sich an Ihre Administration, um
-                den Zugriff zu pruefen.
+                den Zugriff zu prüfen.
               </p>
             </div>
 
@@ -48,9 +48,9 @@ export default function AccountDisabledPage() {
                   Mögliche Ursachen
                 </p>
                 <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-500">
-                  <li>Ihr Benutzerkonto wurde voruebergehend deaktiviert.</li>
+                  <li>Ihr Benutzerkonto wurde vorübergehend deaktiviert.</li>
                   <li>Ihre Mitgliedschaft ist derzeit nicht aktiv.</li>
-                  <li>Die zugehoerige Organisation ist momentan gesperrt.</li>
+                  <li>Die zugehörige Organisation ist momentan gesperrt.</li>
                 </ul>
               </div>
 
@@ -58,7 +58,7 @@ export default function AccountDisabledPage() {
                 href="/login"
                 className="inline-flex h-13 w-full items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#2f46ff,#5748ff)] text-base font-semibold text-white shadow-[0_16px_32px_rgba(67,84,255,0.28)] transition-colors duration-200 hover:border-[#4a4cff] hover:bg-white hover:bg-none hover:text-[#4a4cff] hover:shadow-[0_16px_32px_rgba(67,84,255,0.18)]"
               >
-                Zurueck zum Login
+                Zurück zum Login
               </Link>
 
               <p className="text-center text-sm leading-6 text-slate-500">
@@ -99,7 +99,7 @@ export default function AccountDisabledPage() {
               ALLES IM BLICK.
             </h2>
             <p className="mt-5 max-w-lg text-sm leading-7 text-white/72 sm:text-base">
-              Die zentrale Plattform fuer Kunden, Projekte, Angebote,
+              Die zentrale Plattform für Kunden, Projekte, Angebote,
               Kommunikation und Aufgaben.
             </p>
           </div>

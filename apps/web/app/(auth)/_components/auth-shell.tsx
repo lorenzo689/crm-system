@@ -38,7 +38,7 @@ export function AuthShell({
                 Alles im Blick.
               </h1>
               <p className="max-w-lg text-base leading-7 text-[color:rgba(244,238,227,0.78)] sm:text-lg">
-                Die zentrale Plattform fuer Kunden, Projekte, Angebote,
+                Die zentrale Plattform für Kunden, Projekte, Angebote,
                 Kommunikation und Aufgaben.
               </p>
             </div>
