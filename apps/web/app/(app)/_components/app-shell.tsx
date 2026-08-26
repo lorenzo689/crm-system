@@ -15,9 +15,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         onToggleSidebar={() => setIsSidebarOpen((previousOpen) => !previousOpen)}
       />
 
-      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-zinc-100">
+      <section className="flex h-full w-0 min-w-0 flex-1 flex-col overflow-hidden bg-zinc-100">
         <AppHeader />
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
       </section>
     </main>
   );

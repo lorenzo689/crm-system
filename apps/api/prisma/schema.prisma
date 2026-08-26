@@ -130,21 +130,28 @@ enum ActivityType {
   DOCUMENT_ARCHIVED
 }
 
+enum CalendarEventStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 model Organization {
-  id         String               @id @default(uuid()) @db.Uuid
-  name       String
-  slug       String               @unique
-  status     OrganizationStatus   @default(ACTIVE)
-  createdAt  DateTime             @default(now())
-  updatedAt  DateTime             @updatedAt
-  archivedAt DateTime?
-  members    OrganizationMember[]
-  customers  Customer[]
-  contacts   Contact[]
-  addresses  Address[]
-  projects   Project[]
-  tasks      Task[]
-  documents  Document[]
+  id             String               @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String               @unique
+  status         OrganizationStatus   @default(ACTIVE)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  archivedAt     DateTime?
+  members        OrganizationMember[]
+  customers      Customer[]
+  contacts       Contact[]
+  addresses      Address[]
+  projects       Project[]
+  tasks          Task[]
+  documents      Document[]
+  calendarEvents CalendarEvent[]
 
   @@map("organizations")
 }
@@ -168,6 +175,7 @@ model User {
   activitiesLogged         Activity[]             @relation("ActivityActor")
   statusChanges            ProjectStatusHistory[]
   passwordResetTokens      PasswordResetToken[]
+  calendarEventsCreated    CalendarEvent[]
 
   @@map("users")
 }
@@ -230,6 +238,7 @@ model Customer {
   documents      Document[]
   addresses      CustomerAddress[]
   projects       Project[]
+  calendarEvents CalendarEvent[]
 
   @@unique([organizationId, customerNumber])
   @@index([organizationId, name])
@@ -317,6 +326,7 @@ model Project {
   activities     Activity[]
   documents      Document[]
   statusHistory  ProjectStatusHistory[]
+  calendarEvents CalendarEvent[]
 
   @@unique([organizationId, projectNumber])
   @@index([organizationId, status])
@@ -510,4 +520,32 @@ model ProjectStatusHistory {
 
   @@index([projectId, changedAt])
   @@map("project_status_history")
+}
+
+model CalendarEvent {
+  id              String              @id @default(uuid()) @db.Uuid
+  organizationId  String              @db.Uuid
+  createdByUserId String              @db.Uuid
+  customerId      String?             @db.Uuid
+  projectId       String?             @db.Uuid
+  title           String
+  description     String?
+  location        String?
+  startsAt        DateTime
+  endsAt          DateTime
+  allDay          Boolean             @default(false)
+  status          CalendarEventStatus @default(SCHEDULED)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  archivedAt      DateTime?
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy       User                @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  customer        Customer?           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project         Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, startsAt])
+  @@index([customerId, startsAt])
+  @@index([projectId, startsAt])
+  @@index([organizationId, archivedAt])
+  @@map("calendar_events")
 }
