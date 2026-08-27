@@ -7,26 +7,46 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-    constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-    async findById(id: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { id },
-            select: {
-                id: true,
-                email: true,
-                displayName: true,
-                createdAt: true,
-                updatedAt: true,
-                archivedAt: true,
+  async findById(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        createdAt: true,
+        updatedAt: true,
+        archivedAt: true,
+        organizationRoles: {
+          orderBy: { joinedAt: 'asc' },
+          take: 1,
+          select: {
+            role: true,
+            organization: {
+              select: { name: true },
             },
-        });
+          },
+        },
+      },
+    });
 
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
-    return user; 
+    const [membership] = user.organizationRoles;
+    if (!membership) {
+      throw new ForbiddenException('User has no organization membership');
+    }
+
+    const { organizationRoles: _organizationRoles, ...profile } = user;
+    return {
+      ...profile,
+      organizationName: membership.organization.name,
+      organizationRole: membership.role,
+    };
   }
 
   async getOrganizationId(userId: string): Promise<string> {

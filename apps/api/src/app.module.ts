@@ -13,6 +13,7 @@ import { HealthModule } from './modules/health/health.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { SearchModule } from './modules/search/search.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UsersModule } from './modules/users/users.module';
@@ -32,6 +33,7 @@ import { UsersModule } from './modules/users/users.module';
     NotesModule,
     NotificationsModule,
     ProjectsModule,
+    SearchModule,
     SettingsModule,
     TasksModule,
     DocumentsModule,
