@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
@@ -14,6 +15,12 @@ import {
   SIDEBAR_CLOSED_WIDTH,
   SIDEBAR_OPEN_WIDTH,
 } from "./app-utils";
+import { apiFetch } from "@/lib/auth-api";
+import {
+  getUserInitials,
+  organizationRoleLabels,
+  type CurrentUser,
+} from "@/lib/user-profile";
 
 type AppSidebarProps = {
   isOpen: boolean;
@@ -25,6 +32,11 @@ export function AppSidebar({
   onToggleSidebar,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const [user, setUser] = useState<CurrentUser | null>(null);
+
+  useEffect(() => {
+    apiFetch<CurrentUser>("/users/me").then(setUser).catch(() => undefined);
+  }, []);
 
   return (
     <aside
@@ -96,31 +108,37 @@ export function AppSidebar({
 
       <div
         className={cn(
-          "mt-auto flex shrink-0 items-center pt-6",
-          !isOpen && "justify-center",
+          "mt-auto shrink-0 pt-6",
         )}
       >
-        <Image
-          src="https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png"
-          alt="Anonymes Profilbild"
-          width={40}
-          height={40}
-          className="h-10 w-10 rounded-full border border-zinc-700 bg-zinc-950 object-cover"
-        />
-
-        <div
+        <Link
+          href="/profile"
+          aria-label="Profil öffnen"
           className={cn(
-            "ml-3 overflow-hidden transition-all duration-200 ease-in-out",
-            isOpen ? "max-w-[140px] opacity-100" : "max-w-0 opacity-0",
+            "flex items-center rounded-xl p-2 transition-colors hover:bg-white/10",
+            !isOpen && "justify-center",
           )}
         >
-          <p className="whitespace-nowrap text-sm font-medium text-zinc-100">
-            Max Mustermann
-          </p>
-          <p className="whitespace-nowrap text-xs text-zinc-400">
-            Internal access
-          </p>
-        </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-600 bg-zinc-100 text-sm font-semibold text-zinc-900">
+            {user ? getUserInitials(user.displayName) : "?"}
+          </span>
+
+          <span
+            className={cn(
+              "ml-3 overflow-hidden transition-all duration-200 ease-in-out",
+              isOpen ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
+            )}
+          >
+            <span className="block truncate whitespace-nowrap text-sm font-medium text-zinc-100">
+              {user?.displayName ?? "Profil"}
+            </span>
+            <span className="block truncate whitespace-nowrap text-xs text-zinc-400">
+              {user
+                ? organizationRoleLabels[user.organizationRole]
+                : "Konto wird geladen"}
+            </span>
+          </span>
+        </Link>
       </div>
     </aside>
   );

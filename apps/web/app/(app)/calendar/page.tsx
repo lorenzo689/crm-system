@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/auth-api";
 import {
   CalendarEventFormModal,
@@ -135,6 +136,8 @@ function sortEvents(events: CalendarEvent[]) {
 }
 
 export default function CalendarPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [agendaEvents, setAgendaEvents] = useState<CalendarEvent[]>([]);
   const [monthData, setMonthData] = useState<MonthData | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -152,6 +155,19 @@ export default function CalendarPage() {
     const today = new Date();
     return { year: today.getFullYear(), month: today.getMonth() };
   });
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsModalOpen(true);
+      router.replace("/calendar", { scroll: false });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [router, searchParams]);
 
   useEffect(() => {
     apiFetch<{ calendarDefaultView: "AGENDA" | "MONTH" }>("/settings")

@@ -29,7 +29,7 @@ function formatRelativeTime(dateString: string): string {
   });
 }
 
-export function NotificationsBell() {
+export function NotificationMenu() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);

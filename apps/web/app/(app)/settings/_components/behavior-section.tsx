@@ -3,7 +3,8 @@
 export type BehaviorSettings = {
   defaultTaskView: "LIST" | "KANBAN";
   showCompletedTasks: boolean;
-  calendarDefaultView: "AGENDA" | "MONTH" | "WEEK";
+  calendarDefaultView: "AGENDA" | "MONTH";
+  defaultLandingPage: "DASHBOARD" | "TASKS" | "CALENDAR" | "PROJECTS";
 };
 
 type Props = {
@@ -90,6 +91,27 @@ export function BehaviorSection({ settings, onUpdate }: Props) {
         >
           <option value="AGENDA">Agenda</option>
           <option value="MONTH">Monat</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-zinc-700">
+          Startseite nach der Anmeldung
+        </label>
+        <select
+          value={settings.defaultLandingPage}
+          onChange={(event) =>
+            onUpdate({
+              defaultLandingPage: event.target
+                .value as BehaviorSettings["defaultLandingPage"],
+            })
+          }
+          className="w-full max-w-xs rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none"
+        >
+          <option value="DASHBOARD">Dashboard</option>
+          <option value="TASKS">Aufgaben</option>
+          <option value="CALENDAR">Kalender</option>
+          <option value="PROJECTS">Projekte</option>
         </select>
       </div>
     </div>

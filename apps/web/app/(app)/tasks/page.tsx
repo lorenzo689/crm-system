@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/auth-api";
 import {
   TaskFormModal,
@@ -45,6 +46,8 @@ const priorityLabels: Record<TaskPriority, string> = {
 };
 
 export default function TasksPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -66,6 +69,37 @@ export default function TasksPage() {
   const [hideCompleted, setHideCompleted] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSelectedTask(null);
+      setIsModalOpen(true);
+      router.replace("/tasks", { scroll: false });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId) {
+      return;
+    }
+
+    apiFetch<Task>(`/tasks/${openId}`)
+      .then((task) => {
+        setSelectedTask(task);
+        setIsModalOpen(true);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        router.replace("/tasks", { scroll: false });
+      });
+  }, [router, searchParams]);
 
   useEffect(() => {
     Promise.all([

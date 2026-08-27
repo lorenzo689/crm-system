@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/auth-api";
 import { CustomerDetailSheet } from "./_components/customer-detail-sheet";
 import { CustomerFormModal } from "./_components/customer-form-modal";
@@ -40,6 +41,8 @@ function formatDate(value: string) {
 }
 
 export default function CustomersPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +59,43 @@ export default function CustomersPage() {
   );
   const [isActionPending, setIsActionPending] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFormMode("create");
+      router.replace("/customers", { scroll: false });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId) {
+      return;
+    }
+
+    apiFetch<Customer>(`/customers/${openId}`)
+      .then((customer) => {
+        setCustomers((current) => {
+          const exists = current.some((item) => item.id === customer.id);
+          return exists
+            ? current.map((item) =>
+                item.id === customer.id ? customer : item,
+              )
+            : [...current, customer];
+        });
+        setSelectedCustomerId(customer.id);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        router.replace("/customers", { scroll: false });
+      });
+  }, [router, searchParams]);
 
   function reloadCustomers(focusCustomerId?: string) {
     setIsLoading(true);

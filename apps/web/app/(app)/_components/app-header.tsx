@@ -1,101 +1,69 @@
 "use client";
 
-import Image from "next/image";
-import { FaSearch } from "react-icons/fa";
-import { NotificationsBell } from "@/components/notifications-bell";
-import { logout } from "@/lib/session";
+import { usePathname } from "next/navigation";
+import { CreateMenu } from "@/components/layout/create-menu";
+import { GlobalSearch } from "@/components/layout/global-search";
+import { NotificationMenu } from "@/components/layout/notification-menu";
+import { ProfileMenu } from "@/components/layout/profile-menu";
 
-export function AppHeader() {
-  function handleLogout() {
-    logout();
+const routeTitles: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/customers": "Kunden",
+  "/projects": "Projekte",
+  "/tasks": "Aufgaben",
+  "/calendar": "Kalender",
+  "/documents": "Dokumente",
+  "/settings": "Einstellungen",
+  "/profile": "Profil",
+};
+
+function getPageTitle(pathname: string) {
+  if (routeTitles[pathname]) {
+    return routeTitles[pathname];
   }
 
+  const matchedPrefix = Object.keys(routeTitles).find((route) =>
+    pathname.startsWith(`${route}/`),
+  );
+
+  return matchedPrefix ? routeTitles[matchedPrefix] : "Bissinger OS";
+}
+
+export function AppHeader() {
+  const pathname = usePathname();
+  const pageTitle = getPageTitle(pathname);
+  const today = new Date().toLocaleDateString("de-DE", {
+    day: "numeric",
+    month: "long",
+  });
+
   return (
-    <header className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-8 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur">
-      <div className="flex min-w-0 items-center gap-6">
+    <header className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur md:px-8 md:py-5">
+      <div className="flex min-w-0 items-center gap-3 xl:gap-6">
         <div className="min-w-0">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-zinc-400">
             Bissinger OS
           </p>
-          <h1 className="mt-2 truncate text-[1.7rem] font-semibold tracking-[-0.05em] text-zinc-950">
-            Dashboard
+          <h1 className="mt-2 truncate text-[1.35rem] font-semibold tracking-[-0.05em] text-zinc-950 sm:text-[1.7rem]">
+            {pageTitle}
           </h1>
         </div>
 
-        <div className="hidden h-12 w-px bg-zinc-200 xl:block" />
-
-        <form
-          role="search"
-          onSubmit={(event) => event.preventDefault()}
-          className="hidden h-12 min-w-[380px] max-w-[460px] flex-1 items-center rounded-full border border-zinc-200 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:flex"
-        >
-          <label htmlFor="dashboard-search" className="sr-only">
-            Dashboard durchsuchen
-          </label>
-
-          <div className="flex items-center pl-4 text-sm text-zinc-400">
-            <FaSearch />
-          </div>
-
-          <input
-            id="dashboard-search"
-            name="search"
-            type="search"
-            placeholder="Suche nach Projekten, Kunden oder Aufgaben"
-            className="h-full min-w-0 flex-1 rounded-full border-none bg-transparent px-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-400"
-          />
-
-          <div className="mr-2 flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.18em] text-zinc-400">
-            Global
-          </div>
-        </form>
+        <GlobalSearch />
       </div>
 
-      <div className="ml-6 flex shrink-0 items-center gap-3">
-        <button
-          type="button"
-          className="hidden h-11 items-center justify-center rounded-full border border-transparent bg-zinc-950 px-5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-zinc-800 lg:inline-flex"
-        >
-          Neu
-        </button>
+      <div className="ml-3 flex shrink-0 items-center gap-2 xl:ml-6 xl:gap-3">
+        <CreateMenu />
 
         <button
           type="button"
-          className="hidden h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50 lg:inline-flex"
+          className="hidden h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50 xl:inline-flex"
         >
-          Heute, 16. Juli
+          Heute, {today}
         </button>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50"
-        >
-          Abmelden
-        </button>
-
-        <NotificationsBell />
-
-        <button
-          type="button"
-          className="flex items-center gap-3 rounded-full border border-zinc-200 bg-white p-1.5 pl-1.5 pr-4 transition-colors duration-150 hover:bg-zinc-50"
-        >
-          <Image
-            src="https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png"
-            alt="Profilbild"
-            width={44}
-            height={44}
-            className="h-10 w-10 rounded-full border border-zinc-200 object-cover"
-          />
-          <span className="hidden text-left xl:block">
-            <span className="block text-sm font-semibold text-zinc-900">
-              Max Mustermann
-            </span>
-            <span className="block text-[0.72rem] text-zinc-400">
-              Projektleitung
-            </span>
-          </span>
-        </button>
+        <NotificationMenu />
+        <ProfileMenu />
       </div>
     </header>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import {
@@ -23,6 +24,8 @@ const archiveTabs: { key: ArchiveFilter; label: string }[] = [
 ];
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +37,19 @@ export default function ProjectsPage() {
   const [archiveFilter, setArchiveFilter] =
     useState<ArchiveFilter>("active");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsModalOpen(true);
+      router.replace("/projects", { scroll: false });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [router, searchParams]);
 
   useEffect(() => {
     Promise.all([
