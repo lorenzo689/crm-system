@@ -1,4 +1,5 @@
 import { PrismaService } from "src/common/prisma/prisma.service";
+import { evaluateProjectAttention } from './dashboard-rules';
 
 export async function loadProjectsForEvaluation (
     prisma: PrismaService,
@@ -157,4 +158,81 @@ export async function loadRecentActivities(prisma: PrismaService, organizationId
     message: activity.message,
     occurredAt: activity.occurredAt,
   }));
+}
+
+export async function loadSummaryAndDayStatus(
+  prisma: PrismaService,
+  organizationId: string,
+) {
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setDate(endOfToday.getDate() + 1);
+
+  const [
+    activeProjectsCount,
+    openTasksCount,
+    dueTodayTasksCount,
+    waitingTasksCount,
+  ] = await Promise.all([
+    prisma.project.count({
+      where: { organizationId, archivedAt: null, status: 'ACTIVE' },
+    }),
+    prisma.task.count({
+      where: {
+        organizationId,
+        archivedAt: null,
+        status: { notIn: ['COMPLETED', 'CANCELLED'] },
+      },
+    }),
+    prisma.task.count({
+      where: {
+        organizationId,
+        archivedAt: null,
+        status: { notIn: ['COMPLETED', 'CANCELLED'] },
+        dueAt: { gte: startOfToday, lt: endOfToday },
+      },
+    }),
+    prisma.task.count({
+      where: { organizationId, archivedAt: null, status: 'WAITING' },
+    }),
+  ]);
+
+  const projectsForEvaluation = await loadProjectsForEvaluation(
+    prisma,
+    organizationId,
+  );
+  const evaluations = projectsForEvaluation.map((project) => ({
+    project,
+    reasons: evaluateProjectAttention(project, now),
+  }));
+
+  const projectsNeedingAttention = evaluations.filter(
+    (evaluation) => evaluation.reasons.length > 0,
+  ).length;
+  const projectsOnTrack =
+    projectsForEvaluation.length - projectsNeedingAttention;
+
+  const message =
+    projectsNeedingAttention === 0
+      ? `${projectsOnTrack} Projekte laufen planmäßig.`
+      : `${projectsOnTrack} Projekte laufen planmäßig, ${projectsNeedingAttention} benötigen Aufmerksamkeit.`;
+
+  return {
+    summary: {
+      activeProjects: activeProjectsCount,
+      openTasks: openTasksCount,
+      dueTodayTasks: dueTodayTasksCount,
+      waitingTasks: waitingTasksCount,
+    },
+    dayStatus: {
+      projectsOnTrack,
+      projectsNeedingAttention,
+      message,
+    },
+  };
 }

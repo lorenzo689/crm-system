@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CalendarEventsModule } from './modules/calendar-events/calendar-events.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotesModule } from './modules/notes/notes.module';
@@ -29,6 +30,7 @@ import { UsersModule } from './modules/users/users.module';
     CalendarEventsModule,
     UsersModule,
     CustomersModule,
+    DashboardModule,
     ContactsModule,
     NotesModule,
     NotificationsModule,
