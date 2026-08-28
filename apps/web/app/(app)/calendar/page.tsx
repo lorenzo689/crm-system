@@ -14,6 +14,7 @@ import {
   getMonthGridRange,
   MonthView,
 } from "./_components/month-view";
+import { getWeekRange, WeekView } from "./_components/week-view";
 
 type CalendarView = "agenda" | "month" | "week";
 
@@ -23,6 +24,18 @@ type VisibleMonth = {
 };
 
 type MonthData = {
+  key: string;
+  events: CalendarEvent[];
+  error: string | null;
+};
+
+type VisibleWeek = {
+  year: number;
+  month: number;
+  day: number;
+};
+
+type WeekData = {
   key: string;
   events: CalendarEvent[];
   error: string | null;
@@ -140,6 +153,7 @@ export default function CalendarPage() {
   const searchParams = useSearchParams();
   const [agendaEvents, setAgendaEvents] = useState<CalendarEvent[]>([]);
   const [monthData, setMonthData] = useState<MonthData | null>(null);
+  const [weekData, setWeekData] = useState<WeekData | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,6 +168,19 @@ export default function CalendarPage() {
   const [visibleMonth, setVisibleMonth] = useState<VisibleMonth>(() => {
     const today = new Date();
     return { year: today.getFullYear(), month: today.getMonth() };
+  });
+  const [visibleWeek, setVisibleWeek] = useState<VisibleWeek>(() => {
+    const today = new Date();
+    const { from } = getWeekRange(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+    return {
+      year: from.getFullYear(),
+      month: from.getMonth(),
+      day: from.getDate(),
+    };
   });
 
   useEffect(() => {
@@ -245,10 +272,65 @@ export default function CalendarPage() {
     return () => controller.abort();
   }, [monthKey, view, visibleMonth.month, visibleMonth.year]);
 
+  const weekRange = getWeekRange(
+    visibleWeek.year,
+    visibleWeek.month,
+    visibleWeek.day,
+  );
+  const weekKey = `${weekRange.from.getFullYear()}-${weekRange.from.getMonth()}-${weekRange.from.getDate()}`;
+
+  useEffect(() => {
+    if (view !== "week") {
+      return;
+    }
+
+    const { from, to } = getWeekRange(
+      visibleWeek.year,
+      visibleWeek.month,
+      visibleWeek.day,
+    );
+    const controller = new AbortController();
+
+    apiFetch<CalendarEvent[]>(
+      `/calendar-events?from=${from.toISOString()}&to=${to.toISOString()}`,
+      { signal: controller.signal },
+    )
+      .then((loadedEvents) =>
+        setWeekData({ key: weekKey, events: loadedEvents, error: null }),
+      )
+      .catch((caughtError: unknown) => {
+        if (
+          caughtError instanceof DOMException &&
+          caughtError.name === "AbortError"
+        ) {
+          return;
+        }
+
+        setWeekData({
+          key: weekKey,
+          events: [],
+          error:
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Woche konnte nicht geladen werden.",
+        });
+      });
+
+    return () => controller.abort();
+  }, [
+    view,
+    visibleWeek.day,
+    visibleWeek.month,
+    visibleWeek.year,
+    weekKey,
+  ]);
+
   const activeEvents =
     view === "month" && monthData?.key === monthKey
       ? monthData.events
-      : agendaEvents;
+      : view === "week" && weekData?.key === weekKey
+        ? weekData.events
+        : agendaEvents;
 
   const filteredEvents = useMemo(
     () =>
@@ -295,6 +377,17 @@ export default function CalendarPage() {
               ...current,
               events: sortEvents([...current.events, savedEvent]),
             }
+        : current,
+      );
+    }
+
+    if (eventOverlapsRange(savedEvent, weekRange)) {
+      setWeekData((current) =>
+        current?.key === weekKey
+          ? {
+              ...current,
+              events: sortEvents([...current.events, savedEvent]),
+            }
           : current,
       );
     }
@@ -318,6 +411,9 @@ export default function CalendarPage() {
     view === "month" && monthData?.key === monthKey
       ? monthData.error
       : null;
+  const isWeekLoading = view === "week" && weekData?.key !== weekKey;
+  const weekError =
+    view === "week" && weekData?.key === weekKey ? weekData.error : null;
 
   return (
     <div className="p-6 sm:p-8">
@@ -484,16 +580,31 @@ export default function CalendarPage() {
           />
         ))}
 
-      {view === "week" && (
-        <div className="rounded-xl border border-dashed border-zinc-300 bg-white/60 p-8 text-center">
-          <p className="text-sm font-medium text-zinc-700">
-            Wochenansicht
+      {view === "week" &&
+        (weekError ? (
+          <p className="py-8 text-center text-sm text-red-600">
+            {weekError}
           </p>
-          <p className="mt-1 text-sm text-zinc-400">
-            Das Stundenraster folgt im nächsten Schritt.
-          </p>
-        </div>
-      )}
+        ) : (
+          <div>
+            {isWeekLoading && (
+              <p className="mb-3 text-center text-sm text-zinc-400">
+                Woche wird geladen…
+              </p>
+            )}
+            <WeekView
+              events={isWeekLoading ? [] : filteredEvents}
+              weekStart={weekRange.from}
+              onWeekChange={(newWeekStart) =>
+                setVisibleWeek({
+                  year: newWeekStart.getFullYear(),
+                  month: newWeekStart.getMonth(),
+                  day: newWeekStart.getDate(),
+                })
+              }
+            />
+          </div>
+        ))}
 
       {isModalOpen && (
         <CalendarEventFormModal
