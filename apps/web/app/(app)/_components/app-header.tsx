@@ -38,7 +38,7 @@ export function AppHeader() {
   });
 
   return (
-    <header className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur md:px-8 md:py-5">
+    <header className="relative z-30 flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur md:px-8 md:py-5">
       <div className="flex min-w-0 items-center gap-3 xl:gap-6">
         <div className="min-w-0">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-zinc-400">
