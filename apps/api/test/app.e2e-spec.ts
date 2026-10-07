@@ -2,7 +2,7 @@ jest.mock('../src/common/prisma/prisma.service', () => ({
   PrismaService: class PrismaServiceMock {
     async onModuleInit() {}
     async onModuleDestroy() {}
-    async queryRaw() {
+    async $queryRaw() {
       return [{ '?column?': 1 }];
     }
   },
@@ -14,6 +14,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { STORAGE_SERVICE } from './../src/common/storage/storage.interface';
 
 describe('HealthController (e2e)', () => {
   let app: INestApplication<App>;
@@ -21,7 +22,10 @@ describe('HealthController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(STORAGE_SERVICE)
+      .useValue({})
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
@@ -44,6 +48,6 @@ describe('HealthController (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 });

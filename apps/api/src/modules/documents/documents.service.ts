@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -10,6 +11,8 @@ import type { StorageService } from '../../common/storage/storage.interface';
 import { ActivitiesService } from '../activities/activities.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
+import { assertFileSignature } from './file-signature';
+import { TextExtractionService } from './text-extraction.service';
 import {
   DocumentListFilters,
   DocumentsRepository,
@@ -28,34 +31,57 @@ const ALLOWED_MIME_TYPES = [
   'image/vnd.dwg',
 ];
 
+const DWG_MIME_TYPE = 'image/vnd.dwg';
+const GENERIC_MIME_TYPES = ['', 'application/octet-stream'];
+
+// Browsers usually send no usable MIME type for .dwg, so only that extension
+// is accepted by name; every other type stays strictly MIME-based.
+function resolveMimeType(file: { originalname: string; mimetype?: string }) {
+  const mimeType = file.mimetype?.trim().toLowerCase() ?? '';
+  if (
+    GENERIC_MIME_TYPES.includes(mimeType) &&
+    file.originalname.toLowerCase().endsWith('.dwg')
+  ) {
+    return DWG_MIME_TYPE;
+  }
+  return mimeType;
+}
+
+// Multer hands UTF-8 multipart file names over decoded as latin1 ("PrÃ¼fbericht").
+// Re-decode only when that round-trips losslessly, so real latin1 names stay intact.
+export function normalizeFileName(originalname: string): string {
+  const decoded = Buffer.from(originalname, 'latin1').toString('utf8');
+  const isLosslessUtf8 =
+    !decoded.includes('�') &&
+    Buffer.from(decoded, 'utf8').toString('latin1') === originalname;
+  return isLosslessUtf8 ? decoded : originalname;
+}
+
 function resolveActivityContext(document: {
   customerId: string | null;
   projectId: string | null;
 }) {
   if (document.projectId) return { projectId: document.projectId };
   if (document.customerId) return { customerId: document.customerId };
-  return {};
+  return null;
 }
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     private readonly documentsRepository: DocumentsRepository,
     private readonly prisma: PrismaService,
     @Inject(STORAGE_SERVICE) private readonly storageService: StorageService,
     private readonly activitiesService: ActivitiesService,
+    private readonly textExtractionService: TextExtractionService,
   ) {}
 
   private async assertValidContext(
     organizationId: string,
     context: { customerId?: string; projectId?: string },
   ) {
-    if (!context.customerId && !context.projectId) {
-      throw new BadRequestException(
-        'Document must be linked to at least a customer or project',
-      );
-    }
-
     let customer: { id: string } | null = null;
     if (context.customerId) {
       customer = await this.prisma.customer.findFirst({
@@ -112,12 +138,15 @@ export class DocumentsService {
       authorId,
     });
 
-    await this.activitiesService.log({
-      ...resolveActivityContext(document),
-      actorUserId: authorId,
-      type: 'DOCUMENT_CREATED',
-      message: `Dokument "${document.title}" wurde angelegt`,
-    });
+    const activityContext = resolveActivityContext(document);
+    if (activityContext) {
+      await this.activitiesService.log({
+        ...activityContext,
+        actorUserId: authorId,
+        type: 'DOCUMENT_CREATED',
+        message: `Dokument "${document.title}" wurde angelegt`,
+      });
+    }
 
     return document;
   }
@@ -131,12 +160,15 @@ export class DocumentsService {
     const document = await this.findOne(id, organizationId);
     const archived = await this.documentsRepository.archive(id);
 
-    await this.activitiesService.log({
-      ...resolveActivityContext(document),
-      actorUserId,
-      type: 'DOCUMENT_ARCHIVED',
-      message: `Dokument "${document.title}" wurde archiviert`,
-    });
+    const activityContext = resolveActivityContext(document);
+    if (activityContext) {
+      await this.activitiesService.log({
+        ...activityContext,
+        actorUserId,
+        type: 'DOCUMENT_ARCHIVED',
+        message: `Dokument "${document.title}" wurde archiviert`,
+      });
+    }
 
     return archived;
   }
@@ -160,56 +192,107 @@ export class DocumentsService {
       );
     }
 
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    const mimeType = resolveMimeType(file);
+    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
       throw new BadRequestException(
         `File type "${file.mimetype}" is not allowed`,
       );
     }
 
+    assertFileSignature(file.buffer, mimeType);
+
     const versionNumber =
       await this.documentsRepository.getNextVersionNumber(documentId);
-    const storageKey = `documents/${documentId}/v${versionNumber}/${file.originalname}`;
+    const fileName = normalizeFileName(file.originalname);
+    const storageKey = `documents/${documentId}/v${versionNumber}/${fileName}`;
 
     await this.storageService.upload({
       key: storageKey,
       data: file.buffer,
-      mimeType: file.mimetype,
+      mimeType,
     });
 
     const version = await this.documentsRepository.createVersion({
       documentId,
       versionNumber,
       storageKey,
-      fileName: file.originalname,
-      mimeType: file.mimetype,
+      fileName,
+      mimeType,
       sizeBytes: file.size,
       uploadedById,
     });
 
     await this.documentsRepository.setCurrentVersion(documentId, version.id);
 
+    // Deliberately not awaited: the upload response must not wait for extraction.
+    void this.extractTextInBackground(
+      version.id,
+      file.buffer,
+      mimeType,
+      fileName,
+    );
+
     const result = await this.findOne(documentId, organizationId);
 
-    await this.activitiesService.log({
-      ...resolveActivityContext(document),
-      actorUserId: uploadedById,
-      type: 'DOCUMENT_VERSION_ADDED',
-      message: `Neue Version von "${document.title}" hochgeladen (v${versionNumber})`,
-    });
+    const activityContext = resolveActivityContext(document);
+    if (activityContext) {
+      await this.activitiesService.log({
+        ...activityContext,
+        actorUserId: uploadedById,
+        type: 'DOCUMENT_VERSION_ADDED',
+        message: `Neue Version von "${document.title}" hochgeladen (v${versionNumber})`,
+      });
+    }
 
     return result;
   }
 
-  async getDownloadUrl(documentId: string, organizationId: string) {
+  private async extractTextInBackground(
+    versionId: string,
+    buffer: Buffer,
+    mimeType: string,
+    fileName: string,
+  ) {
+    try {
+      const text = await this.textExtractionService.extractSafely(
+        buffer,
+        mimeType,
+        `${fileName} (${versionId})`,
+      );
+      if (text) {
+        await this.documentsRepository.setExtractedText(versionId, text);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not store extracted text for version ${versionId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  async getDownloadUrl(
+    documentId: string,
+    organizationId: string,
+    options: { disposition?: 'inline' | 'attachment'; versionId?: string } = {},
+  ) {
     const document = await this.findOne(documentId, organizationId);
 
-    if (!document.currentVersion) {
-      throw new NotFoundException('Document has no uploaded version yet');
+    const version = options.versionId
+      ? document.versions.find(
+          (candidate) => candidate.id === options.versionId,
+        )
+      : document.currentVersion;
+
+    if (!version) {
+      throw new NotFoundException(
+        options.versionId
+          ? 'Version not found'
+          : 'Document has no uploaded version yet',
+      );
     }
 
-    return this.storageService.createDownloadUrl(
-      document.currentVersion.storageKey,
-      300,
-    );
+    return this.storageService.createDownloadUrl(version.storageKey, 300, {
+      disposition: options.disposition ?? 'inline',
+      fileName: version.fileName,
+    });
   }
 }

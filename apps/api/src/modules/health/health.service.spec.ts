@@ -7,7 +7,7 @@ describe('HealthService', () => {
 
   beforeEach(async () => {
     const prismaMock = {
-      queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+      $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
     };
 
     const module: TestingModule = await Test.createTestingModule({

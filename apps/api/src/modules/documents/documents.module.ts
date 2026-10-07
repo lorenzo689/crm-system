@@ -6,10 +6,11 @@ import { UsersModule } from '../users/users.module';
 import { DocumentsController } from './documents.controller';
 import { DocumentsRepository } from './documents.repository';
 import { DocumentsService } from './documents.service';
+import { TextExtractionService } from './text-extraction.service';
 
 @Module({
   imports: [AuthModule, UsersModule, StorageModule, ActivitiesModule],
   controllers: [DocumentsController],
-  providers: [DocumentsService, DocumentsRepository],
+  providers: [DocumentsService, DocumentsRepository, TextExtractionService],
 })
 export class DocumentsModule {}

@@ -15,11 +15,12 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
-import type { DocumentType } from '../../../generated/prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { DownloadUrlQueryDto } from './dto/download-url-query.dto';
+import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { DocumentsService } from './documents.service';
 
@@ -32,22 +33,15 @@ export class DocumentsController {
   ) {}
 
   @Get()
-  async findAll(
-    @Req() req: Request,
-    @Query('customerId') customerId?: string,
-    @Query('projectId') projectId?: string,
-    @Query('type') type?: DocumentType,
-    @Query('archived') archived?: string,
-  ) {
+  async findAll(@Req() req: Request, @Query() query: ListDocumentsQueryDto) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
     return this.documentsService.findAll(organizationId, {
-      customerId,
-      projectId,
-      type,
-      archived: archived === undefined ? undefined : archived === 'true',
+      ...query,
+      archived:
+        query.archived === undefined ? undefined : query.archived === 'true',
     });
   }
 
@@ -97,9 +91,7 @@ export class DocumentsController {
     @Param('id') id: string,
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }),
-        ],
+        validators: [new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 })],
       }),
     )
     file: Express.Multer.File,
@@ -118,12 +110,19 @@ export class DocumentsController {
   }
 
   @Get(':id/download-url')
-  async getDownloadUrl(@Param('id') id: string, @Req() req: Request) {
+  async getDownloadUrl(
+    @Param('id') id: string,
+    @Query() query: DownloadUrlQueryDto,
+    @Req() req: Request,
+  ) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    const url = await this.documentsService.getDownloadUrl(id, organizationId);
+    const url = await this.documentsService.getDownloadUrl(id, organizationId, {
+      disposition: query.disposition,
+      versionId: query.version,
+    });
     return { url };
   }
 }

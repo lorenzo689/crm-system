@@ -103,6 +103,8 @@ enum NoteType {
 enum DocumentType {
   GENERAL
   OFFER
+  PRICE_LIST
+  DATASHEET
   DRAWING
   PLAN
   PHOTO
@@ -514,6 +516,7 @@ model Document {
   authorId         String            @db.Uuid
   title            String
   type             DocumentType      @default(GENERAL)
+  tags             String[]           @default([])
   currentVersionId String?           @unique @db.Uuid
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -539,6 +542,7 @@ model DocumentVersion {
   fileName      String
   mimeType      String
   sizeBytes     Int
+  extractedText String?
   uploadedById  String    @db.Uuid
   createdAt     DateTime  @default(now())
   document      Document  @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)

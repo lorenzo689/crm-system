@@ -4,26 +4,13 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import { DocumentUploadModal } from "@/components/document-upload-modal";
 import { VersionUploadModal } from "@/components/version-upload-modal";
-
-type DocumentType =
-  | "GENERAL"
-  | "OFFER"
-  | "DRAWING"
-  | "PLAN"
-  | "PHOTO"
-  | "SPECIFICATION"
-  | "PROTOCOL"
-  | "OTHER";
-
-type DocumentVersion = {
-  id: string;
-  versionNumber: number;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  createdAt: string;
-  uploadedBy: { id: string; displayName: string };
-};
+import {
+  documentTypeLabels,
+  formatFileSize,
+  openDocumentDownload,
+  type DocumentType,
+  type DocumentVersion,
+} from "@/lib/documents";
 
 type Document = {
   id: string;
@@ -39,23 +26,6 @@ type DocumentsSectionProps = {
   contextParam: "customerId" | "projectId";
   contextId: string;
 };
-
-const documentTypeLabels: Record<DocumentType, string> = {
-  GENERAL: "Allgemein",
-  OFFER: "Angebot",
-  DRAWING: "Zeichnung",
-  PLAN: "Plan",
-  PHOTO: "Foto",
-  SPECIFICATION: "Spezifikation",
-  PROTOCOL: "Protokoll",
-  OTHER: "Sonstiges",
-};
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export function DocumentsSection({
   contextParam,
@@ -90,10 +60,7 @@ export function DocumentsSection({
     setOpenMenuId(null);
     setDownloadingId(documentId);
     try {
-      const { url } = await apiFetch<{ url: string }>(
-        `/documents/${documentId}/download-url`,
-      );
-      window.open(url, "_blank");
+      await openDocumentDownload(documentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download fehlgeschlagen");
     } finally {

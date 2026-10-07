@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaSearch } from "react-icons/fa";
 import { apiFetch } from "@/lib/auth-api";
+import { documentTypeLabels, type DocumentType } from "@/lib/documents";
 
 type SearchResult = {
   id: string;
@@ -11,16 +12,33 @@ type SearchResult = {
   href: string;
 };
 
+type DocumentSearchResult = SearchResult & {
+  type: DocumentType;
+  assignment:
+    | { kind: "global" }
+    | { kind: "customer"; name: string }
+    | { kind: "project"; name: string; customerName: string };
+  snippet: string | null;
+};
+
 type SearchResponse = {
   customers: SearchResult[];
   projects: SearchResult[];
   tasks: SearchResult[];
+  documents: DocumentSearchResult[];
 };
+
+function assignmentLabel(assignment: DocumentSearchResult["assignment"]) {
+  if (assignment.kind === "global") return "Global";
+  if (assignment.kind === "customer") return assignment.name;
+  return `${assignment.name} · ${assignment.customerName}`;
+}
 
 const emptyResults: SearchResponse = {
   customers: [],
   projects: [],
   tasks: [],
+  documents: [],
 };
 
 const resultCategories: Array<{
@@ -30,7 +48,26 @@ const resultCategories: Array<{
   { key: "customers", label: "Kunden" },
   { key: "projects", label: "Projekte" },
   { key: "tasks", label: "Aufgaben" },
+  { key: "documents", label: "Dokumente" },
 ];
+
+function DocumentResultDetails({ result }: { result: DocumentSearchResult }) {
+  return (
+    <>
+      <span className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
+        <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+          {documentTypeLabels[result.type]}
+        </span>
+        <span className="truncate">{assignmentLabel(result.assignment)}</span>
+      </span>
+      {result.snippet && (
+        <span className="mt-0.5 block truncate text-xs text-zinc-500">
+          …{result.snippet}…
+        </span>
+      )}
+    </>
+  );
+}
 
 export function GlobalSearch() {
   const [query, setQuery] = useState("");
@@ -133,7 +170,7 @@ export function GlobalSearch() {
         className="flex h-12 items-center rounded-full border border-zinc-200 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
       >
         <label htmlFor="global-search" className="sr-only">
-          Kunden, Projekte und Aufgaben durchsuchen
+          Kunden, Projekte, Aufgaben und Dokumente durchsuchen
         </label>
 
         <div className="flex items-center pl-4 text-sm text-zinc-400">
@@ -147,7 +184,7 @@ export function GlobalSearch() {
           value={query}
           onChange={(event) => handleChange(event.target.value)}
           onFocus={() => query.trim().length >= 2 && setIsOpen(true)}
-          placeholder="Suche nach Projekten, Kunden oder Aufgaben"
+          placeholder="Suche nach Projekten, Kunden, Aufgaben oder Dokumenten"
           autoComplete="off"
           className="h-full min-w-0 flex-1 rounded-full border-none bg-transparent px-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-400"
         />
@@ -181,6 +218,9 @@ export function GlobalSearch() {
                       className="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
                     >
                       {item.label}
+                      {"assignment" in item && (
+                        <DocumentResultDetails result={item} />
+                      )}
                     </button>
                   ))}
                 </div>

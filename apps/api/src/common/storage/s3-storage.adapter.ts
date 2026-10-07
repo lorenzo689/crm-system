@@ -1,30 +1,77 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
+  CreateBucketCommand,
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { StorageService } from './storage.interface';
+import { DownloadUrlOptions, StorageService } from './storage.interface';
+
+/** RFC 6266 header: ASCII fallback plus RFC 5987 `filename*` for umlauts etc. */
+export function buildAttachmentDisposition(fileName: string): string {
+  const fallback = fileName.replace(/[^\x20-\x7e]|["\\%]/g, '_');
+  const encoded = encodeURIComponent(fileName).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+function requiredEnvironmentVariable(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+function isMissingBucketError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const candidate = error as {
+    name?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+
+  return (
+    candidate.$metadata?.httpStatusCode === 404 ||
+    candidate.name === 'NotFound' ||
+    candidate.name === 'NoSuchBucket'
+  );
+}
 
 @Injectable()
-export class S3StorageAdapter implements StorageService {
+export class S3StorageAdapter implements StorageService, OnModuleInit {
+  private readonly logger = new Logger(S3StorageAdapter.name);
   private readonly client: S3Client;
   private readonly bucket: string;
 
   constructor() {
-    this.bucket = process.env.S3_BUCKET!;
+    this.bucket = requiredEnvironmentVariable('S3_BUCKET');
     this.client = new S3Client({
-      endpoint: process.env.S3_ENDPOINT,
-      region: process.env.S3_REGION,
+      endpoint: requiredEnvironmentVariable('S3_ENDPOINT'),
+      region: requiredEnvironmentVariable('S3_REGION'),
       forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
       credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY!,
-        secretAccessKey: process.env.S3_SECRET_KEY!,
+        accessKeyId: requiredEnvironmentVariable('S3_ACCESS_KEY'),
+        secretAccessKey: requiredEnvironmentVariable('S3_SECRET_KEY'),
       },
     });
+  }
+
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch (error) {
+      if (!isMissingBucketError(error)) throw error;
+
+      await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+      this.logger.log(`Created object storage bucket "${this.bucket}"`);
+    }
   }
 
   async upload(input: {
@@ -40,6 +87,14 @@ export class S3StorageAdapter implements StorageService {
         ContentType: input.mimeType,
       }),
     );
+  }
+
+  async download(key: string): Promise<Buffer> {
+    const response = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    if (!response.Body) throw new Error(`Empty object body for ${key}`);
+    return Buffer.from(await response.Body.transformToByteArray());
   }
 
   async delete(key: string): Promise<void> {
@@ -62,8 +117,17 @@ export class S3StorageAdapter implements StorageService {
   async createDownloadUrl(
     key: string,
     expiresInSeconds: number,
+    options: DownloadUrlOptions = {},
   ): Promise<string> {
-    const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ...(options.disposition === 'attachment' && {
+        ResponseContentDisposition: buildAttachmentDisposition(
+          options.fileName ?? key.split('/').pop() ?? 'download',
+        ),
+      }),
+    });
     return getSignedUrl(this.client, command, { expiresIn: expiresInSeconds });
   }
 }

@@ -1,18 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/auth-api";
-import { ACCESS_TOKEN_KEY } from "@/lib/session";
-
-type DocumentType =
-  | "GENERAL"
-  | "OFFER"
-  | "DRAWING"
-  | "PLAN"
-  | "PHOTO"
-  | "SPECIFICATION"
-  | "PROTOCOL"
-  | "OTHER";
+import {
+  createDocumentWithFile,
+  documentTypeLabels,
+  fileTooLargeMessage,
+  MAX_FILE_SIZE_BYTES,
+  type DocumentType,
+} from "@/lib/documents";
 
 type DocumentUploadModalProps = {
   isOpen: boolean;
@@ -21,19 +16,6 @@ type DocumentUploadModalProps = {
   onClose: () => void;
   onUploaded: () => void;
 };
-
-const documentTypeLabels: Record<DocumentType, string> = {
-  GENERAL: "Allgemein",
-  OFFER: "Angebot",
-  DRAWING: "Zeichnung",
-  PLAN: "Plan",
-  PHOTO: "Foto",
-  SPECIFICATION: "Spezifikation",
-  PROTOCOL: "Protokoll",
-  OTHER: "Sonstiges",
-};
-
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 export function DocumentUploadModal({
   isOpen,
@@ -60,9 +42,7 @@ export function DocumentUploadModal({
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0] ?? null;
     if (selected && selected.size > MAX_FILE_SIZE_BYTES) {
-      setError(
-        `Datei zu groß (max. ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB)`,
-      );
+      setError(fileTooLargeMessage());
       setFile(null);
       return;
     }
@@ -82,42 +62,10 @@ export function DocumentUploadModal({
     setError(null);
 
     try {
-      const document = await apiFetch<{ id: string }>("/documents", {
-        method: "POST",
-        body: JSON.stringify({
-          [contextParam]: contextId,
-          title: title.trim(),
-          type,
-        }),
-      });
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
-
-      const uploadResponse = await fetch(
-        `${apiUrl}/documents/${document.id}/versions`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        },
+      await createDocumentWithFile(
+        { [contextParam]: contextId, title: title.trim(), type },
+        file,
       );
-
-      if (!uploadResponse.ok) {
-        const errorBody = (await uploadResponse.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(
-          errorBody?.message ??
-            "Datei-Upload fehlgeschlagen, Dokument wurde ohne Datei angelegt",
-        );
-      }
 
       resetForm();
       onUploaded();
