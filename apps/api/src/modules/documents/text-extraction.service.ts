@@ -5,7 +5,7 @@ import { extractText, getDocumentProxy } from 'unpdf';
 
 export const MAX_EXTRACTED_CHARS = 500_000;
 const EXTRACTION_TIMEOUT_MS = 30_000;
-const MAX_XML_ENTRY_BYTES = 100 * 1024 * 1024;
+const MAX_UNPACKED_BYTES = 50 * 1024 * 1024;
 
 const DOCX_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -41,13 +41,32 @@ function joinTextRuns(xml: string): string {
     .join('');
 }
 
+/**
+ * Zip-bomb guard: sums the declared uncompressed sizes from the central
+ * directory without inflating anything.
+ */
+export function assertUnpackedSizeWithinLimit(buffer: Buffer) {
+  let total = 0;
+  unzipSync(new Uint8Array(buffer), {
+    filter: (file) => {
+      total += file.originalSize;
+      return false;
+    },
+  });
+  if (total > MAX_UNPACKED_BYTES) {
+    throw new Error(
+      `archive expands to ${total} bytes (limit ${MAX_UNPACKED_BYTES})`,
+    );
+  }
+}
+
 /** Cell values of all sheets (shared/inline strings and numbers) as text. */
 export function extractXlsxText(buffer: Buffer): string {
+  assertUnpackedSizeWithinLimit(buffer);
   const files = unzipSync(new Uint8Array(buffer), {
     filter: (file) =>
-      file.originalSize <= MAX_XML_ENTRY_BYTES &&
-      (file.name === 'xl/sharedStrings.xml' ||
-        /^xl\/worksheets\/[^/]+\.xml$/.test(file.name)),
+      file.name === 'xl/sharedStrings.xml' ||
+      /^xl\/worksheets\/[^/]+\.xml$/.test(file.name),
   });
   const decoder = new TextDecoder('utf-8');
 
@@ -156,6 +175,7 @@ export class TextExtractionService {
     }
 
     if (mimeType === DOCX_MIME) {
+      assertUnpackedSizeWithinLimit(buffer);
       const { value } = await extractRawText({ buffer });
       return value;
     }
