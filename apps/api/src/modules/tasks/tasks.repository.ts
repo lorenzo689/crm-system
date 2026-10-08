@@ -59,7 +59,11 @@ export class TasksRepository {
 
     return this.prisma.task.findMany({
       where,
-      orderBy: { dueAt: 'asc' },
+      // Dated tasks first (soonest due first), undated ones newest first.
+      orderBy: [
+        { dueAt: { sort: 'asc', nulls: 'last' } },
+        { createdAt: 'desc' },
+      ],
       include: {
         project: { select: { id: true, name: true, projectNumber: true } },
         assignments: {

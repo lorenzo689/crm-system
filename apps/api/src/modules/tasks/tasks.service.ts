@@ -13,6 +13,11 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskListFilters, TasksRepository } from './tasks.repository';
 
+/** undefined keeps the value, null clears it, a string sets it. */
+function toDate(value: string | null | undefined) {
+  return value ? new Date(value) : value;
+}
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -116,8 +121,8 @@ export class TasksService {
           ? { connect: { id: projectId } }
           : { disconnect: true },
       }),
-      startAt: dto.startAt ? new Date(dto.startAt) : undefined,
-      dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
+      startAt: toDate(dto.startAt),
+      dueAt: toDate(dto.dueAt),
       ...(completedAt !== undefined && { completedAt }),
     });
 

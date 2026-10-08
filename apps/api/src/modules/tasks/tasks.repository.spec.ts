@@ -40,4 +40,18 @@ describe('TasksRepository.findAll', () => {
 
     expect(whereOf()).not.toHaveProperty('projectId');
   });
+
+  it('sorts dated tasks first (ascending), undated newest first', async () => {
+    const findMany = jest.fn(() => Promise.resolve([]));
+    const repository = new TasksRepository({ task: { findMany } } as never);
+
+    await repository.findAll('org-1', {});
+
+    expect(
+      (findMany.mock.calls[0] as unknown as [{ orderBy: unknown }])[0].orderBy,
+    ).toEqual([
+      { dueAt: { sort: 'asc', nulls: 'last' } },
+      { createdAt: 'desc' },
+    ]);
+  });
 });

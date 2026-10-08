@@ -20,6 +20,7 @@ export type Task = {
   priority: TaskPriority;
   startAt: string | null;
   dueAt: string | null;
+  createdAt: string;
   completedAt: string | null;
   archivedAt: string | null;
   project: { id: string; name: string; projectNumber: string } | null;
@@ -151,8 +152,9 @@ export function TaskFormModal({
         description: formState.description.trim() || undefined,
         status: formState.status,
         priority: formState.priority,
-        startAt: formState.startAt || undefined,
-        dueAt: formState.dueAt || undefined,
+        // Empty date field means "remove" when editing, "none" when creating.
+        startAt: formState.startAt || (task ? null : undefined),
+        dueAt: formState.dueAt || (task ? null : undefined),
       };
 
       let savedTask: Task;
@@ -353,9 +355,20 @@ export function TaskFormModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">
-                Startdatum
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-xs font-medium text-zinc-600">
+                  Startdatum
+                </label>
+                {formState.startAt && (
+                  <button
+                    type="button"
+                    onClick={() => updateField("startAt", "")}
+                    className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
+                  >
+                    Datum entfernen
+                  </button>
+                )}
+              </div>
               <input
                 type="date"
                 value={formState.startAt}
@@ -367,9 +380,20 @@ export function TaskFormModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">
-                Fälligkeit
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-xs font-medium text-zinc-600">
+                  Fälligkeit
+                </label>
+                {formState.dueAt && (
+                  <button
+                    type="button"
+                    onClick={() => updateField("dueAt", "")}
+                    className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
+                  >
+                    Datum entfernen
+                  </button>
+                )}
+              </div>
               <input
                 type="date"
                 value={formState.dueAt}

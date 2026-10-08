@@ -1,4 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { UpdateTaskDto } from './dto/update-task.dto';
 import { TasksService } from './tasks.service';
 
 const ORG = 'org-1';
@@ -122,5 +125,41 @@ describe('TasksService without project', () => {
       service.update('task-1', 'org-2', USER, { projectId: 'p-1' }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it('clears dueAt and startAt with null', async () => {
+    const { service, repository } = setup();
+
+    await service.update('task-1', ORG, USER, { dueAt: null, startAt: null });
+
+    expect(repository.update.mock.calls[0][1]).toMatchObject({
+      dueAt: null,
+      startAt: null,
+    });
+  });
+
+  it('sets dates as Date and keeps them when omitted', async () => {
+    const { service, repository } = setup();
+
+    await service.update('task-1', ORG, USER, { dueAt: '2026-10-20' });
+    await service.update('task-1', ORG, USER, { title: 'Neu' });
+
+    expect(repository.update.mock.calls[0][1].dueAt).toEqual(
+      new Date('2026-10-20'),
+    );
+    expect(repository.update.mock.calls[1][1].dueAt).toBeUndefined();
+    expect(repository.update.mock.calls[1][1].startAt).toBeUndefined();
+  });
+});
+
+describe('UpdateTaskDto dates', () => {
+  it('accepts null, valid dates and omission; rejects garbage', async () => {
+    const check = (body: object) =>
+      validate(plainToInstance(UpdateTaskDto, body));
+
+    expect(await check({ dueAt: null, startAt: null })).toHaveLength(0);
+    expect(await check({ dueAt: '2026-10-20' })).toHaveLength(0);
+    expect(await check({})).toHaveLength(0);
+    expect(await check({ dueAt: 'morgen' })).not.toHaveLength(0);
   });
 });

@@ -93,6 +93,10 @@ export default function TasksPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const quickInputRef = useRef<HTMLInputElement>(null);
   const isQuickAddingRef = useRef(false);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(
+    null,
+  );
+  const highlightTimerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") {
@@ -216,7 +220,18 @@ export default function TasksPage() {
       );
     }
 
-    return result;
+    // Dated tasks first (soonest due first), undated ones newest first.
+    return [...result].sort((a, b) => {
+      if (a.dueAt && b.dueAt) {
+        return (
+          new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime() ||
+          b.createdAt.localeCompare(a.createdAt)
+        );
+      }
+      if (a.dueAt) return -1;
+      if (b.dueAt) return 1;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
   }, [
     archiveFilter,
     assigneeFilter,
@@ -305,6 +320,12 @@ export default function TasksPage() {
 
       upsertTask(saved);
       setQuickTitle("");
+      setHighlightedTaskId(saved.id);
+      window.clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = window.setTimeout(
+        () => setHighlightedTaskId(null),
+        2000,
+      );
     } catch (caughtError) {
       setQuickError(
         caughtError instanceof Error
@@ -598,7 +619,10 @@ export default function TasksPage() {
                 <tr
                   key={task.id}
                   data-overdue={isOverdue || undefined}
-                  className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50"
+                  data-highlighted={task.id === highlightedTaskId || undefined}
+                  className={`border-b border-zinc-100 transition-colors duration-700 last:border-0 hover:bg-zinc-50 ${
+                    task.id === highlightedTaskId ? "bg-amber-50" : ""
+                  }`}
                 >
                   <td className="px-4 py-3">
                     <input
