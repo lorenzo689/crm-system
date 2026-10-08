@@ -36,7 +36,7 @@ type DashboardResponse = {
   myTasks: Array<{
     id: string;
     title: string;
-    projectName: string;
+    projectName: string | null;
     priority: TaskPriority;
     dueAt: string | null;
     status: TaskStatus;
@@ -324,7 +324,7 @@ export function DashboardContent() {
                           {task.title}
                         </td>
                         <td className="border-b border-zinc-200 px-4 py-5 text-[0.95rem] leading-7 text-zinc-500">
-                          {task.projectName}
+                          {task.projectName ?? "Ohne Projekt"}
                         </td>
                         <td className="border-b border-zinc-200 px-4 py-5">
                           <span className="inline-flex rounded-full border border-zinc-900 bg-zinc-900 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-white">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/auth-api";
 import {
@@ -45,12 +46,29 @@ const priorityLabels: Record<TaskPriority, string> = {
   HIGH: "Hoch",
 };
 
+function isOpenStatus(status: TaskStatus) {
+  return status !== "COMPLETED" && status !== "CANCELLED";
+}
+
+function getDayBounds() {
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setDate(endOfToday.getDate() + 1);
+  return { startOfToday, endOfToday };
+}
+
 export default function TasksPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserOption | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +87,12 @@ export default function TasksPage() {
   const [hideCompleted, setHideCompleted] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const quickInputRef = useRef<HTMLInputElement>(null);
+  const isQuickAddingRef = useRef(false);
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") {
@@ -109,11 +133,13 @@ export default function TasksPage() {
       apiFetch<{ showCompletedTasks: boolean }>("/settings").catch(() => ({
         showCompletedTasks: true,
       })),
+      apiFetch<UserOption>("/users/me").catch(() => null),
     ])
-      .then(([loadedTasks, loadedProjects, loadedUsers, settings]) => {
+      .then(([loadedTasks, loadedProjects, loadedUsers, settings, me]) => {
         setTasks(loadedTasks);
         setProjects(loadedProjects);
         setUsers(loadedUsers);
+        setCurrentUser(me);
         setHideCompleted(!settings.showCompletedTasks);
       })
       .catch((caughtError: unknown) =>
@@ -140,18 +166,17 @@ export default function TasksPage() {
     }
 
     if (hideCompleted) {
-      result = result.filter(
-        (task) =>
-          task.status !== "COMPLETED" && task.status !== "CANCELLED",
-      );
+      result = result.filter((task) => isOpenStatus(task.status));
     }
 
     if (priorityFilter !== "all") {
       result = result.filter((task) => task.priority === priorityFilter);
     }
 
-    if (projectFilter !== "all") {
-      result = result.filter((task) => task.project.id === projectFilter);
+    if (projectFilter === "none") {
+      result = result.filter((task) => !task.project);
+    } else if (projectFilter !== "all") {
+      result = result.filter((task) => task.project?.id === projectFilter);
     }
 
     if (assigneeFilter !== "all") {
@@ -163,14 +188,7 @@ export default function TasksPage() {
     }
 
     if (dueFilter !== "all") {
-      const now = new Date();
-      const startOfToday = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-      );
-      const endOfToday = new Date(startOfToday);
-      endOfToday.setDate(endOfToday.getDate() + 1);
+      const { startOfToday, endOfToday } = getDayBounds();
 
       result = result.filter((task) => {
         if (!task.dueAt) {
@@ -179,11 +197,7 @@ export default function TasksPage() {
 
         const due = new Date(task.dueAt);
         if (dueFilter === "overdue") {
-          return (
-            due < startOfToday &&
-            task.status !== "COMPLETED" &&
-            task.status !== "CANCELLED"
-          );
+          return due < startOfToday && isOpenStatus(task.status);
         }
         if (dueFilter === "today") {
           return due >= startOfToday && due < endOfToday;
@@ -236,6 +250,126 @@ export default function TasksPage() {
     });
   }
 
+  function patchTask(taskId: string, patch: Partial<Task>) {
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId ? { ...task, ...patch } : task,
+      ),
+    );
+  }
+
+  async function handleQuickAdd(event: React.FormEvent) {
+    event.preventDefault();
+    const title = quickTitle.trim();
+    if (!title || isQuickAddingRef.current) {
+      return;
+    }
+
+    isQuickAddingRef.current = true;
+    setQuickError(null);
+    try {
+      const created = await apiFetch<Task>("/tasks", {
+        method: "POST",
+        body: JSON.stringify({ title, priority: "MEDIUM" }),
+      });
+
+      let saved = created;
+      if (currentUser) {
+        try {
+          await apiFetch(`/tasks/${created.id}/assignments`, {
+            method: "POST",
+            body: JSON.stringify({
+              userId: currentUser.id,
+              role: "RESPONSIBLE",
+            }),
+          });
+          saved = {
+            ...created,
+            assignments: [
+              {
+                userId: currentUser.id,
+                role: "RESPONSIBLE",
+                user: {
+                  id: currentUser.id,
+                  displayName: currentUser.displayName,
+                },
+              },
+            ],
+          };
+        } catch {
+          setQuickError(
+            "Aufgabe wurde angelegt, konnte dir aber nicht zugewiesen werden.",
+          );
+        }
+      }
+
+      upsertTask(saved);
+      setQuickTitle("");
+    } catch (caughtError) {
+      setQuickError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Aufgabe konnte nicht angelegt werden.",
+      );
+    } finally {
+      isQuickAddingRef.current = false;
+      quickInputRef.current?.focus();
+    }
+  }
+
+  async function handleToggleDone(task: Task) {
+    const wasCompleted = task.status === "COMPLETED";
+    const previous = { status: task.status, completedAt: task.completedAt };
+
+    setActionError(null);
+    patchTask(task.id, {
+      status: wasCompleted ? "OPEN" : "COMPLETED",
+      completedAt: wasCompleted ? null : new Date().toISOString(),
+    });
+
+    try {
+      const saved = wasCompleted
+        ? await apiFetch<Task>(`/tasks/${task.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: "OPEN" }),
+          })
+        : await apiFetch<Task>(`/tasks/${task.id}/complete`, {
+            method: "POST",
+          });
+      patchTask(task.id, {
+        status: saved.status,
+        completedAt: saved.completedAt,
+      });
+    } catch (caughtError) {
+      patchTask(task.id, previous);
+      setActionError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Status konnte nicht geändert werden.",
+      );
+    }
+  }
+
+  async function handleArchiveToggle(task: Task) {
+    const restoring = Boolean(task.archivedAt);
+
+    setActionError(null);
+    try {
+      // The archive endpoints return the bare task, so only take archivedAt.
+      const saved = await apiFetch<{ archivedAt: string | null }>(
+        `/tasks/${task.id}/${restoring ? "unarchive" : "archive"}`,
+        { method: "POST" },
+      );
+      patchTask(task.id, { archivedAt: saved.archivedAt });
+    } catch (caughtError) {
+      setActionError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Archivieren fehlgeschlagen.",
+      );
+    }
+  }
+
   function closeModal() {
     setIsModalOpen(false);
     setSelectedTask(null);
@@ -248,6 +382,8 @@ export default function TasksPage() {
   if (error) {
     return <p className="p-8 text-sm text-red-600">{error}</p>;
   }
+
+  const { startOfToday, endOfToday } = getDayBounds();
 
   return (
     <div className="p-8">
@@ -292,6 +428,26 @@ export default function TasksPage() {
         </div>
       </div>
 
+      <form onSubmit={handleQuickAdd} className="mb-4">
+        <input
+          ref={quickInputRef}
+          type="text"
+          value={quickTitle}
+          onChange={(event) => setQuickTitle(event.target.value)}
+          placeholder="Neue Aufgabe … (Enter zum Anlegen)"
+          maxLength={200}
+          aria-label="Neue Aufgabe"
+          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none"
+        />
+        {quickError && (
+          <p className="mt-1 text-sm text-red-600">{quickError}</p>
+        )}
+      </form>
+
+      {actionError && (
+        <p className="mb-3 text-sm text-red-600">{actionError}</p>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
           type="text"
@@ -300,6 +456,25 @@ export default function TasksPage() {
           placeholder="Aufgabe suchen…"
           className="w-full max-w-xs rounded-lg border border-zinc-200 px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none"
         />
+
+        {currentUser && (
+          <button
+            type="button"
+            aria-pressed={assigneeFilter === currentUser.id}
+            onClick={() =>
+              setAssigneeFilter((current) =>
+                current === currentUser.id ? "all" : currentUser.id,
+              )
+            }
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              assigneeFilter === currentUser.id
+                ? "border-amber-400 bg-amber-50 text-amber-800"
+                : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+            }`}
+          >
+            Meine Aufgaben
+          </button>
+        )}
 
         <select
           value={statusFilter}
@@ -337,6 +512,7 @@ export default function TasksPage() {
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
         >
           <option value="all">Alle Projekte</option>
+          <option value="none">Ohne Projekt</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}
@@ -368,6 +544,15 @@ export default function TasksPage() {
           <option value="upcoming">Bevorstehend</option>
         </select>
 
+        <label className="flex items-center gap-2 text-sm text-zinc-600">
+          <input
+            type="checkbox"
+            checked={hideCompleted}
+            onChange={(event) => setHideCompleted(event.target.checked)}
+          />
+          Erledigte ausblenden
+        </label>
+
         <button
           type="button"
           onClick={resetFilters}
@@ -381,6 +566,9 @@ export default function TasksPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wider text-zinc-400">
+              <th className="w-10 px-4 py-3 font-medium">
+                <span className="sr-only">Erledigt</span>
+              </th>
               <th className="px-4 py-3 font-medium">Titel</th>
               <th className="px-4 py-3 font-medium">Projekt</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -396,17 +584,52 @@ export default function TasksPage() {
                 task.assignments.find(
                   (assignment) => assignment.role === "RESPONSIBLE",
                 )?.user.displayName ?? "–";
+              const isDone = task.status === "COMPLETED";
+              const due = task.dueAt ? new Date(task.dueAt) : null;
+              const isOverdue =
+                due !== null && due < startOfToday && isOpenStatus(task.status);
+              const isDueToday =
+                due !== null &&
+                due >= startOfToday &&
+                due < endOfToday &&
+                isOpenStatus(task.status);
 
               return (
                 <tr
                   key={task.id}
+                  data-overdue={isOverdue || undefined}
                   className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50"
                 >
-                  <td className="px-4 py-3 font-medium text-zinc-900">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={isDone}
+                      disabled={task.status === "CANCELLED"}
+                      onChange={() => handleToggleDone(task)}
+                      aria-label={
+                        isDone
+                          ? `„${task.title}“ wieder öffnen`
+                          : `„${task.title}“ erledigen`
+                      }
+                      className="h-4 w-4 cursor-pointer accent-emerald-600"
+                    />
+                  </td>
+                  <td
+                    className={`px-4 py-3 font-medium ${
+                      isDone ? "text-zinc-400 line-through" : "text-zinc-900"
+                    }`}
+                  >
                     {task.title}
                   </td>
                   <td className="px-4 py-3 text-zinc-600">
-                    {task.project.name}
+                    {task.project && (
+                      <Link
+                        href={`/projects/${task.project.id}`}
+                        className="hover:text-zinc-900 hover:underline"
+                      >
+                        {task.project.name}
+                      </Link>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -421,22 +644,52 @@ export default function TasksPage() {
                   <td className="px-4 py-3 text-zinc-600">
                     {responsible}
                   </td>
-                  <td className="px-4 py-3 text-zinc-600">
-                    {task.dueAt
-                      ? new Date(task.dueAt).toLocaleDateString("de-DE")
-                      : "–"}
+                  <td
+                    className={`px-4 py-3 ${
+                      isOverdue
+                        ? "font-medium text-red-600"
+                        : isDueToday
+                          ? "font-medium text-amber-700"
+                          : "text-zinc-600"
+                    }`}
+                  >
+                    {due ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        {isOverdue && (
+                          <span
+                            title="Überfällig"
+                            className="inline-block h-2 w-2 rounded-full bg-red-600"
+                          />
+                        )}
+                        {due.toLocaleDateString("de-DE")}
+                        {isDueToday && (
+                          <span className="text-xs font-normal">heute</span>
+                        )}
+                      </span>
+                    ) : (
+                      "–"
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedTask(task);
-                        setIsModalOpen(true);
-                      }}
-                      className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
-                    >
-                      Bearbeiten
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTask(task);
+                          setIsModalOpen(true);
+                        }}
+                        className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
+                      >
+                        Bearbeiten
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleArchiveToggle(task)}
+                        className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
+                      >
+                        {task.archivedAt ? "Wiederherstellen" : "Archivieren"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

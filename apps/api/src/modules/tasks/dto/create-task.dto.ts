@@ -12,8 +12,9 @@ import {
 } from '../../../../generated/prisma/client';
 
 export class CreateTaskDto {
+  @IsOptional()
   @IsUUID()
-  projectId!: string;
+  projectId?: string;
 
   @IsString()
   @MaxLength(200)

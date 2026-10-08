@@ -20,8 +20,9 @@ export type Task = {
   priority: TaskPriority;
   startAt: string | null;
   dueAt: string | null;
+  completedAt: string | null;
   archivedAt: string | null;
-  project: { id: string; name: string; projectNumber: string };
+  project: { id: string; name: string; projectNumber: string } | null;
   assignments: {
     userId: string;
     role: string;
@@ -37,6 +38,8 @@ type TaskFormModalProps = {
   task?: Task | null;
   projects: ProjectOption[];
   users: UserOption[];
+  /** Preselected project when creating a new task (e.g. from a project page). */
+  defaultProjectId?: string;
   onClose: () => void;
   onSaved: (task: Task) => void;
 };
@@ -90,6 +93,7 @@ export function TaskFormModal({
   task,
   projects,
   users,
+  defaultProjectId,
   onClose,
   onSaved,
 }: TaskFormModalProps) {
@@ -108,7 +112,7 @@ export function TaskFormModal({
         (assignment) => assignment.role === "RESPONSIBLE",
       );
       setFormState({
-        projectId: task.project.id,
+        projectId: task.project?.id ?? "",
         title: task.title,
         description: task.description ?? "",
         status: task.status,
@@ -118,11 +122,14 @@ export function TaskFormModal({
         dueAt: toDateInputValue(task.dueAt),
       });
     } else {
-      setFormState(initialFormState);
+      setFormState({
+        ...initialFormState,
+        projectId: defaultProjectId ?? "",
+      });
     }
     setError(null);
     setWarning(null);
-  }, [isOpen, task]);
+  }, [isOpen, task, defaultProjectId]);
 
   if (!isOpen) {
     return null;
@@ -157,14 +164,17 @@ export function TaskFormModal({
       if (task) {
         savedTask = await apiFetch<Task>(`/tasks/${task.id}`, {
           method: "PATCH",
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            ...payload,
+            projectId: formState.projectId || null,
+          }),
         });
       } else {
         savedTask = await apiFetch<Task>("/tasks", {
           method: "POST",
           body: JSON.stringify({
             ...payload,
-            projectId: formState.projectId,
+            projectId: formState.projectId || undefined,
           }),
         });
       }
@@ -242,13 +252,9 @@ export function TaskFormModal({
               onChange={(event) =>
                 updateField("projectId", event.target.value)
               }
-              required
-              disabled={Boolean(task)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none disabled:bg-zinc-50 disabled:text-zinc-400"
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none"
             >
-              <option value="" disabled>
-                Projekt wählen…
-              </option>
+              <option value="">Kein Projekt</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}

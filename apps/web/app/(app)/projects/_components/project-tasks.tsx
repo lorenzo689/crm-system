@@ -60,6 +60,11 @@ export function ProjectTasks({ projectId, projectName }: ProjectTasksProps) {
   }, [projectId]);
 
   function upsertTask(updatedTask: Task) {
+    // The modal can move a task to another project or remove it from this one.
+    if (updatedTask.project?.id !== projectId) {
+      setTasks((current) => current.filter((task) => task.id !== updatedTask.id));
+      return;
+    }
     setTasks((current) => {
       const exists = current.some((task) => task.id === updatedTask.id);
       return exists
@@ -174,6 +179,7 @@ export function ProjectTasks({ projectId, projectName }: ProjectTasksProps) {
         task={editingTask}
         projects={[{ id: projectId, name: projectName }]}
         users={users}
+        defaultProjectId={projectId}
         onClose={() => {
           setIsModalOpen(false);
           setEditingTask(null);

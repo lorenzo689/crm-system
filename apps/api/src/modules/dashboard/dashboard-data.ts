@@ -98,7 +98,7 @@ export async function loadMyTasks (
         return {
             id: task.id, 
             title: task.title,
-            projectName: task.project.name, 
+            projectName: task.project?.name ?? null, 
             priority: task.priority, 
             dueAt: task.dueAt, 
             status: task.status, 

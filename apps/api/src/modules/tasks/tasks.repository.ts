@@ -7,6 +7,8 @@ import {
 
 export type TaskListFilters = {
   projectId?: string;
+  /** Only tasks without a project (project=none). Wins over projectId. */
+  withoutProject?: boolean;
   assigneeId?: string;
   status?: Prisma.TaskWhereInput['status'];
   priority?: Prisma.TaskWhereInput['priority'];
@@ -32,6 +34,7 @@ export class TasksRepository {
     const where: Prisma.TaskWhereInput = {
       organizationId,
       ...(filters.projectId && { projectId: filters.projectId }),
+      ...(filters.withoutProject && { projectId: null }),
       ...(filters.status && { status: filters.status }),
       ...(filters.priority && { priority: filters.priority }),
       ...(filters.archived === true && { archivedAt: { not: null } }),

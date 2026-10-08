@@ -35,6 +35,7 @@ export class TasksController {
   async findAll(
     @Req() req: Request,
     @Query('projectId') projectId?: string,
+    @Query('project') project?: string,
     @Query('assigneeId') assigneeId?: string,
     @Query('status') status?: TaskStatus,
     @Query('priority') priority?: TaskPriority,
@@ -48,6 +49,7 @@ export class TasksController {
     );
     return this.tasksService.findAll(organizationId, {
       projectId,
+      withoutProject: project === 'none',
       assigneeId,
       status,
       priority,

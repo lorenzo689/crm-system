@@ -50,7 +50,9 @@ export class TasksService {
     actorUserId: string,
     dto: CreateTaskDto,
   ) {
-    await this.assertProjectExists(dto.projectId, organizationId);
+    if (dto.projectId) {
+      await this.assertProjectExists(dto.projectId, organizationId);
+    }
 
     const task = await this.tasksRepository.create({
       ...dto,
@@ -89,6 +91,11 @@ export class TasksService {
   ) {
     const existingTask = await this.findOne(id, organizationId);
 
+    const { projectId, ...taskFields } = dto;
+    if (projectId) {
+      await this.assertProjectExists(projectId, organizationId);
+    }
+
     let completedAt: Date | null | undefined = undefined;
     const becameCompleted =
       dto.status === TaskStatus.COMPLETED &&
@@ -103,7 +110,12 @@ export class TasksService {
     }
 
     const updatedTask = await this.tasksRepository.update(id, {
-      ...dto,
+      ...taskFields,
+      ...(projectId !== undefined && {
+        project: projectId
+          ? { connect: { id: projectId } }
+          : { disconnect: true },
+      }),
       startAt: dto.startAt ? new Date(dto.startAt) : undefined,
       dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
       ...(completedAt !== undefined && { completedAt }),
