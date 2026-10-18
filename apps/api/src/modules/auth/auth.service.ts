@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -8,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthMailService } from './auth-mail.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -19,11 +20,21 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 const BISSINGER_ORG_SLUG = 'bissinger-lights';
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync(
   'not-the-right-password',
   SALT_ROUNDS,
 );
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function safeEqual(a: string, b: string) {
+  const left = createHash('sha256').update(a).digest();
+  const right = createHash('sha256').update(b).digest();
+  return timingSafeEqual(left, right);
+}
 
 @Injectable()
 export class AuthService {
@@ -36,6 +47,16 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    // Without a registration code anyone could join the organization with a
+    // made-up company address, so registration stays closed until one is set.
+    const registrationCode = process.env.REGISTRATION_CODE;
+    if (!registrationCode) {
+      throw new ForbiddenException('Registrierung ist deaktiviert');
+    }
+    if (!safeEqual(dto.registrationCode, registrationCode)) {
+      throw new ForbiddenException('Registrierungscode ist ungültig');
+    }
+
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -54,6 +75,11 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
+    // The first person to join a fresh organization becomes its owner.
+    const memberCount = await this.prisma.organizationMember.count({
+      where: { organizationId: organization.id },
+    });
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -62,7 +88,7 @@ export class AuthService {
         organizationRoles: {
           create: {
             organizationId: organization.id,
-            role: 'MEMBER',
+            role: memberCount === 0 ? 'OWNER' : 'MEMBER',
           },
         },
       },
@@ -79,7 +105,7 @@ export class AuthService {
     const passwordHash = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
     const isValid = await bcrypt.compare(dto.password, passwordHash);
 
-    if (!user || !user.passwordHash || !isValid) {
+    if (!user || !user.passwordHash || !isValid || user.archivedAt) {
       throw new UnauthorizedException('E-Mail oder Passwort falsch');
     }
 
@@ -116,7 +142,7 @@ export class AuthService {
       this.prisma.passwordResetToken.create({
         data: {
           userId: user.id,
-          token,
+          token: hashToken(token),
           expiresAt,
         },
       }),
@@ -157,7 +183,7 @@ export class AuthService {
 
   async resetPassword(dto: ResetPasswordDto) {
     const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { token: dto.token },
+      where: { token: hashToken(dto.token) },
       select: {
         id: true,
         userId: true,

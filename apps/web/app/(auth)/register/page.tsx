@@ -69,6 +69,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [registrationCode, setRegistrationCode] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -102,6 +103,7 @@ export default function RegisterPage() {
         email,
         displayName,
         password,
+        registrationCode,
       });
       storeAccessToken(accessToken);
       router.push("/dashboard");
@@ -184,6 +186,27 @@ export default function RegisterPage() {
                   className="h-14 w-full rounded-[0.3rem] border border-[#cfcfcf] bg-white px-4 pr-12 text-sm text-[#1f1f1f] outline-none transition placeholder:text-[#aaa] focus:border-[#d69a35] focus:ring-1 focus:ring-[#d69a35]"
                 />
                 <FiUser className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-lg text-[#aaa]" />
+              </div>
+
+              <div className="relative">
+                <label
+                  htmlFor="registrationCode"
+                  className="absolute -top-2.5 left-4 z-10 bg-white px-1.5 text-xs font-medium text-[#6b6b6b]"
+                >
+                  Registrierungscode
+                </label>
+                <input
+                  id="registrationCode"
+                  name="registrationCode"
+                  type="password"
+                  autoComplete="off"
+                  placeholder="Code von deinem Administrator"
+                  value={registrationCode}
+                  onChange={(event) => setRegistrationCode(event.target.value)}
+                  maxLength={200}
+                  required
+                  className="h-14 w-full rounded-[0.3rem] border border-[#cfcfcf] bg-white px-4 text-sm text-[#1f1f1f] outline-none transition placeholder:text-[#aaa] focus:border-[#d69a35] focus:ring-1 focus:ring-[#d69a35]"
+                />
               </div>
 
               <div>

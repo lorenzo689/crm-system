@@ -9,7 +9,8 @@ import {
   TbLayoutSidebarLeftExpand,
 } from "react-icons/tb";
 
-import { menuItems, type MenuItem } from "./app-data";
+import { menuItems, prefetchPaths, type MenuItem } from "./app-data";
+import { prefetchApi } from "@/lib/use-api";
 import {
   cn,
   SIDEBAR_CLOSED_WIDTH,
@@ -90,7 +91,10 @@ export function AppSidebar({
 
       <nav
         aria-label="Hauptnavigation"
-        className={cn("min-h-0 flex-1", isOpen ? "mt-6" : "mt-8")}
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overflow-x-hidden",
+          isOpen ? "mt-6" : "mt-8",
+        )}
       >
         <ul className="space-y-0.5">
           {menuItems.map((item) => (
@@ -165,6 +169,10 @@ function SidebarMenuItem({
     >
       <Link
         href={item.href}
+        onMouseEnter={() => {
+          const path = prefetchPaths[item.href];
+          if (path) prefetchApi(path);
+        }}
         className={cn(
           "flex w-full cursor-pointer items-center text-left",
           isSidebarOpen ? "justify-start gap-x-4" : "justify-center",

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { FinanceOverview } from "@/components/finance-overview";
 import { apiFetch } from "@/lib/auth-api";
 import type { CurrentUser } from "@/lib/user-profile";
 
@@ -184,6 +185,7 @@ export function DashboardContent() {
   return (
     <div className="flex-1 overflow-auto bg-[linear-gradient(180deg,#f4f4f5_0%,#fafafa_100%)] px-4 py-6 sm:px-8 sm:py-8">
       <div className="space-y-5">
+        <FinanceOverview />
         <section className="grid min-h-[448px] overflow-hidden rounded-[2rem] border border-zinc-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.06)] xl:grid-cols-[1.08fr_0.92fr]">
           <div className="flex flex-col justify-between px-6 py-8 sm:px-10 sm:py-10">
             <div className="max-w-[560px]">

@@ -133,6 +133,73 @@ enum ActivityType {
   CALENDAR_EVENT_CREATED
   CALENDAR_EVENT_UPDATED
   CALENDAR_EVENT_CANCELLED
+  DUNNING_SENT
+  PAYMENT_RECORDED
+  CREDIT_NOTE_CREATED
+  QUOTE_CREATED
+  QUOTE_STATUS_CHANGED
+  INVOICE_CREATED
+  INVOICE_STATUS_CHANGED
+}
+
+enum InboundEmailStatus {
+  NEW
+  DONE
+  IGNORED
+}
+
+enum AiProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FAILED
+}
+
+enum AiProposalSource {
+  CHAT
+  AGENT
+}
+
+enum ReservationStatus {
+  TENTATIVE
+  CONFIRMED
+  RETURNED
+  CANCELLED
+}
+
+enum SupplierInvoiceStatus {
+  OPEN
+  PAID
+  DISPUTED
+}
+
+enum BankTransactionStatus {
+  UNMATCHED
+  MATCHED
+  IGNORED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum SalesDocumentType {
+  QUOTE
+  INVOICE
+  CREDIT_NOTE
+}
+
+enum SalesDocumentStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  PAID
+  CANCELLED
 }
 
 enum CalendarEventStatus {
@@ -178,21 +245,34 @@ enum LandingPage {
 }
 
 model Organization {
-  id             String               @id @default(uuid()) @db.Uuid
-  name           String
-  slug           String               @unique
-  status         OrganizationStatus   @default(ACTIVE)
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  archivedAt     DateTime?
-  members        OrganizationMember[]
-  customers      Customer[]
-  contacts       Contact[]
-  addresses      Address[]
-  projects       Project[]
-  tasks          Task[]
-  documents      Document[]
-  calendarEvents CalendarEvent[]
+  id                String               @id @default(uuid()) @db.Uuid
+  name              String
+  slug              String               @unique
+  status            OrganizationStatus   @default(ACTIVE)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  archivedAt        DateTime?
+  members           OrganizationMember[]
+  customers         Customer[]
+  contacts          Contact[]
+  addresses         Address[]
+  projects          Project[]
+  tasks             Task[]
+  documents         Document[]
+  calendarEvents    CalendarEvent[]
+  articles          Article[]
+  salesDocuments    SalesDocument[]
+  numberSequences   NumberSequence[]
+  companyProfile    CompanyProfile?
+  suppliers         Supplier[]
+  purchaseOrders    PurchaseOrder[]
+  aiProposals       AiProposal[]
+  inboundEmails     InboundEmail[]
+  reservations      Reservation[]
+  supplierInvoices  SupplierInvoice[]
+  bankTransactions  BankTransaction[]
+  timeEntries       TimeEntry[]
+  recurringInvoices RecurringInvoice[]
 
   @@map("organizations")
 }
@@ -214,6 +294,8 @@ model User {
   documentsAuthored        Document[]
   documentVersionsUploaded DocumentVersion[]
   activitiesLogged         Activity[]             @relation("ActivityActor")
+  salesDocumentsCreated    SalesDocument[]        @relation("SalesDocumentCreator")
+  timeEntries              TimeEntry[]            @relation("TimeEntryUser")
   statusChanges            ProjectStatusHistory[]
   passwordResetTokens      PasswordResetToken[]
   calendarEventsCreated    CalendarEvent[]
@@ -285,24 +367,29 @@ model OrganizationMember {
 }
 
 model Customer {
-  id             String            @id @default(uuid()) @db.Uuid
-  organizationId String            @db.Uuid
-  name           String
-  customerNumber String
-  website        String?
-  status         CustomerStatus    @default(ACTIVE)
-  description    String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  archivedAt     DateTime?
-  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  contacts       Contact[]
-  notesGeneric   Note[]
-  activities     Activity[]
-  documents      Document[]
-  addresses      CustomerAddress[]
-  projects       Project[]
-  calendarEvents CalendarEvent[]
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @db.Uuid
+  name              String
+  customerNumber    String
+  website           String?
+  status            CustomerStatus     @default(ACTIVE)
+  description       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  archivedAt        DateTime?
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  contacts          Contact[]
+  notesGeneric      Note[]
+  activities        Activity[]
+  documents         Document[]
+  addresses         CustomerAddress[]
+  projects          Project[]
+  calendarEvents    CalendarEvent[]
+  salesDocuments    SalesDocument[]
+  inboundEmails     InboundEmail[]
+  reservations      Reservation[]
+  timeEntries       TimeEntry[]
+  recurringInvoices RecurringInvoice[]
 
   @@unique([organizationId, customerNumber])
   @@index([organizationId, name])
@@ -367,30 +454,35 @@ model CustomerAddress {
 }
 
 model Project {
-  id             String                 @id @default(uuid()) @db.Uuid
-  organizationId String                 @db.Uuid
-  customerId     String                 @db.Uuid
-  name           String
-  projectNumber  String
-  status         ProjectStatus          @default(PLANNED)
-  priority       ProjectPriority        @default(MEDIUM)
-  description    String?
-  startsAt       DateTime?
-  endsAt         DateTime?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  archivedAt     DateTime?
-  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customer       Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  members        ProjectMember[]
-  contacts       ProjectContact[]
-  addresses      ProjectAddress[]
-  tasks          Task[]
-  notes          Note[]
-  activities     Activity[]
-  documents      Document[]
-  statusHistory  ProjectStatusHistory[]
-  calendarEvents CalendarEvent[]
+  id                String                 @id @default(uuid()) @db.Uuid
+  organizationId    String                 @db.Uuid
+  customerId        String                 @db.Uuid
+  name              String
+  projectNumber     String
+  status            ProjectStatus          @default(PLANNED)
+  priority          ProjectPriority        @default(MEDIUM)
+  description       String?
+  startsAt          DateTime?
+  endsAt            DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  archivedAt        DateTime?
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer          Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  members           ProjectMember[]
+  contacts          ProjectContact[]
+  addresses         ProjectAddress[]
+  tasks             Task[]
+  notes             Note[]
+  activities        Activity[]
+  documents         Document[]
+  statusHistory     ProjectStatusHistory[]
+  calendarEvents    CalendarEvent[]
+  salesDocuments    SalesDocument[]
+  reservations      Reservation[]
+  timeEntries       TimeEntry[]
+  recurringInvoices RecurringInvoice[]
+  purchaseOrders    PurchaseOrder[]
 
   @@unique([organizationId, projectNumber])
   @@index([organizationId, status])
@@ -516,7 +608,7 @@ model Document {
   authorId         String            @db.Uuid
   title            String
   type             DocumentType      @default(GENERAL)
-  tags             String[]           @default([])
+  tags             String[]          @default([])
   currentVersionId String?           @unique @db.Uuid
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -649,4 +741,381 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+model Article {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String              @db.Uuid
+  articleNumber    String
+  name             String
+  description      String?
+  unit             String              @default("Stk")
+  unitPriceCents   Int
+  vatRateBp        Int                 @default(1900)
+  trackStock       Boolean             @default(false)
+  stockQuantity    Int                 @default(0)
+  minStock         Int                 @default(0)
+  isRentable       Boolean             @default(false)
+  rentalStock      Int                 @default(0)
+  rentalPriceCents Int                 @default(0)
+  reservations     Reservation[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  archivedAt       DateTime?
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  items            SalesDocumentItem[]
+  purchaseItems    PurchaseOrderItem[]
+
+  @@unique([organizationId, articleNumber])
+  @@index([organizationId, archivedAt])
+  @@index([organizationId, name])
+  @@map("articles")
+}
+
+model NumberSequence {
+  organizationId String       @db.Uuid
+  key            String
+  lastValue      Int          @default(0)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@id([organizationId, key])
+  @@map("number_sequences")
+}
+
+model SalesDocument {
+  id                String              @id @default(uuid()) @db.Uuid
+  organizationId    String              @db.Uuid
+  type              SalesDocumentType
+  number            String
+  status            SalesDocumentStatus @default(DRAFT)
+  customerId        String              @db.Uuid
+  projectId         String?             @db.Uuid
+  sourceQuoteId     String?             @db.Uuid
+  creditedInvoiceId String?             @db.Uuid
+  creditedCents     Int                 @default(0)
+  issueDate         DateTime            @db.Date
+  dueDate           DateTime?           @db.Date
+  headerText        String?
+  footerText        String?
+  netCents          Int                 @default(0)
+  vatCents          Int                 @default(0)
+  grossCents        Int                 @default(0)
+  createdById       String?             @db.Uuid
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  paidAt            DateTime?
+  paidCents         Int                 @default(0)
+  dunningLevel      Int                 @default(0)
+  lastDunnedAt      DateTime?
+  payments          Payment[]
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project           Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  sourceQuote       SalesDocument?      @relation("QuoteToInvoice", fields: [sourceQuoteId], references: [id], onDelete: Restrict)
+  invoices          SalesDocument[]     @relation("QuoteToInvoice")
+  creditedInvoice   SalesDocument?      @relation("InvoiceCredits", fields: [creditedInvoiceId], references: [id], onDelete: Restrict)
+  creditNotes       SalesDocument[]     @relation("InvoiceCredits")
+  timeEntries       TimeEntry[]
+  bankTransactions  BankTransaction[]
+  createdBy         User?               @relation("SalesDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items             SalesDocumentItem[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, type, status])
+  @@index([organizationId, type, issueDate])
+  @@index([customerId])
+  @@index([projectId])
+  @@map("sales_documents")
+}
+
+model SalesDocumentItem {
+  id              String        @id @default(uuid()) @db.Uuid
+  salesDocumentId String        @db.Uuid
+  position        Int
+  articleId       String?       @db.Uuid
+  description     String
+  quantity        Decimal       @db.Decimal(12, 3)
+  unit            String        @default("Stk")
+  unitPriceCents  Int
+  vatRateBp       Int           @default(1900)
+  netCents        Int
+  salesDocument   SalesDocument @relation(fields: [salesDocumentId], references: [id], onDelete: Cascade)
+  article         Article?      @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@unique([salesDocumentId, position])
+  @@index([articleId])
+  @@map("sales_document_items")
+}
+
+model CompanyProfile {
+  organizationId         String       @id @db.Uuid
+  legalName              String
+  street                 String?
+  postalCode             String?
+  city                   String?
+  country                String?      @default("Deutschland")
+  email                  String?
+  phone                  String?
+  website                String?
+  vatId                  String?
+  taxNumber              String?
+  bankName               String?
+  iban                   String?
+  bic                    String?
+  defaultPaymentTermDays Int          @default(14)
+  defaultHourlyRateCents Int          @default(0)
+  invoiceFooter          String?
+  updatedAt              DateTime     @updatedAt
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+model Payment {
+  id              String        @id @default(uuid()) @db.Uuid
+  salesDocumentId String        @db.Uuid
+  amountCents     Int
+  paidAt          DateTime      @db.Date
+  method          String?
+  note            String?
+  createdById     String?       @db.Uuid
+  createdAt       DateTime      @default(now())
+  salesDocument   SalesDocument @relation(fields: [salesDocumentId], references: [id], onDelete: Restrict)
+
+  @@index([salesDocumentId])
+  @@index([paidAt])
+  @@map("payments")
+}
+
+model Supplier {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  supplierNumber String
+  name           String
+  email          String?
+  phone          String?
+  street         String?
+  postalCode     String?
+  city           String?
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  archivedAt     DateTime?
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  purchaseOrders PurchaseOrder[]
+  invoices       SupplierInvoice[]
+
+  @@unique([organizationId, supplierNumber])
+  @@index([organizationId, name])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String              @db.Uuid
+  supplierId       String              @db.Uuid
+  projectId        String?             @db.Uuid
+  number           String
+  status           PurchaseOrderStatus @default(DRAFT)
+  orderDate        DateTime            @db.Date
+  expectedDate     DateTime?           @db.Date
+  notes            String?
+  netCents         Int                 @default(0)
+  createdById      String?             @db.Uuid
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  supplier         Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  project          Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  items            PurchaseOrderItem[]
+  supplierInvoices SupplierInvoice[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+  @@index([supplierId])
+  @@index([projectId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(uuid()) @db.Uuid
+  purchaseOrderId  String        @db.Uuid
+  position         Int
+  articleId        String?       @db.Uuid
+  description      String
+  quantity         Int
+  receivedQuantity Int           @default(0)
+  unit             String        @default("Stk")
+  unitPriceCents   Int
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  article          Article?      @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@unique([purchaseOrderId, position])
+  @@map("purchase_order_items")
+}
+
+model AiProposal {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  source         AiProposalSource
+  kind           String
+  title          String
+  summary        String?
+  payload        Json
+  status         AiProposalStatus @default(PENDING)
+  result         Json?
+  error          String?
+  dedupeKey      String?
+  requestedById  String?          @db.Uuid
+  decidedById    String?          @db.Uuid
+  decidedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, status, createdAt])
+  @@map("ai_proposals")
+}
+
+model InboundEmail {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @db.Uuid
+  messageId      String
+  fromAddress    String
+  fromName       String?
+  subject        String
+  textBody       String
+  receivedAt     DateTime
+  customerId     String?            @db.Uuid
+  status         InboundEmailStatus @default(NEW)
+  category       String?
+  aiSummary      String?
+  createdAt      DateTime           @default(now())
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, messageId])
+  @@index([organizationId, status, receivedAt])
+  @@index([customerId])
+  @@map("inbound_emails")
+}
+
+model Reservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  articleId      String            @db.Uuid
+  customerId     String?           @db.Uuid
+  projectId      String?           @db.Uuid
+  quantity       Int
+  startsOn       DateTime          @db.Date
+  endsOn         DateTime          @db.Date
+  status         ReservationStatus @default(CONFIRMED)
+  note           String?
+  createdById    String?           @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  article        Article           @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  customer       Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  project        Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, articleId, startsOn, endsOn])
+  @@index([organizationId, status])
+  @@index([projectId])
+  @@map("reservations")
+}
+
+model SupplierInvoice {
+  id               String                @id @default(uuid()) @db.Uuid
+  organizationId   String                @db.Uuid
+  supplierId       String                @db.Uuid
+  purchaseOrderId  String?               @db.Uuid
+  invoiceNumber    String
+  status           SupplierInvoiceStatus @default(OPEN)
+  issueDate        DateTime              @db.Date
+  dueDate          DateTime?             @db.Date
+  netCents         Int
+  vatCents         Int
+  grossCents       Int
+  paidAt           DateTime?             @db.Date
+  notes            String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  supplier         Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder    PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  bankTransactions BankTransaction[]
+
+  @@unique([organizationId, supplierId, invoiceNumber])
+  @@index([organizationId, status, dueDate])
+  @@map("supplier_invoices")
+}
+
+model BankTransaction {
+  id                String                @id @default(uuid()) @db.Uuid
+  organizationId    String                @db.Uuid
+  bookingDate       DateTime              @db.Date
+  amountCents       Int
+  counterparty      String?
+  purpose           String?
+  importHash        String
+  status            BankTransactionStatus @default(UNMATCHED)
+  salesDocumentId   String?               @db.Uuid
+  supplierInvoiceId String?               @db.Uuid
+  createdAt         DateTime              @default(now())
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesDocument     SalesDocument?        @relation(fields: [salesDocumentId], references: [id], onDelete: SetNull)
+  supplierInvoice   SupplierInvoice?      @relation(fields: [supplierInvoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, importHash])
+  @@index([organizationId, status, bookingDate])
+  @@map("bank_transactions")
+}
+
+model TimeEntry {
+  id               String         @id @default(uuid()) @db.Uuid
+  organizationId   String         @db.Uuid
+  userId           String         @db.Uuid
+  customerId       String?        @db.Uuid
+  projectId        String?        @db.Uuid
+  workDate         DateTime       @db.Date
+  minutes          Int
+  description      String
+  billable         Boolean        @default(true)
+  hourlyRateCents  Int            @default(0)
+  billedDocumentId String?        @db.Uuid
+  createdAt        DateTime       @default(now())
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user             User           @relation("TimeEntryUser", fields: [userId], references: [id], onDelete: Restrict)
+  customer         Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  project          Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  billedDocument   SalesDocument? @relation(fields: [billedDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, workDate])
+  @@index([userId, workDate])
+  @@index([projectId])
+  @@index([organizationId, billable, billedDocumentId])
+  @@map("time_entries")
+}
+
+model RecurringInvoice {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  customerId     String       @db.Uuid
+  projectId      String?      @db.Uuid
+  title          String
+  intervalMonths Int
+  nextRunDate    DateTime     @db.Date
+  active         Boolean      @default(true)
+  headerText     String?
+  footerText     String?
+  items          Json
+  lastRunAt      DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, active, nextRunDate])
+  @@map("recurring_invoices")
 }

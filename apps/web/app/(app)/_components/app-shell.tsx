@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { CommandPalette } from "@/components/layout/command-palette";
 import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
 
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <AppHeader />
         <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
       </section>
+      <CommandPalette />
     </main>
   );
 }

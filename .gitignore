@@ -44,6 +44,7 @@ yarn-error.log*
 .env*
 !.env.example
 !**/.env.example
+!**/.env.prod.example
 
 # vercel
 .vercel
@@ -51,3 +52,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local runtime artifacts
+.runtime/
+*.log
+**/dist-scripts
+apps/api/apps/

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bissinger
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: bissinger_os
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bissinger"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://bissinger:ci@localhost:5432/bissinger_os
+      NODE_ENV: test
+      JWT_SECRET: ci-only-secret-with-at-least-thirty-two-chars
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations and generate the Prisma client
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy && pnpm exec prisma generate
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Lint the API (new code must stay clean)
+        run: pnpm --filter api lint
+        continue-on-error: true

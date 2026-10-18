@@ -28,6 +28,7 @@ export type LoginInput = {
 
 export type RegisterInput = LoginInput & {
   displayName: string;
+  registrationCode: string;
 };
 
 const API_URL =
@@ -112,4 +113,23 @@ export function forgotPassword(input: { email: string }) {
 
 export function resetPassword(input: { token: string; password: string }) {
   return requestAuth("reset-password", input) as Promise<ResetPasswordResponse>;
+}
+
+/** Like apiFetch, but returns the raw Response (for streams and file downloads). */
+export async function apiFetchRaw(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+  if (!headers.has("Content-Type") && init?.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_URL}${path}`, { ...init, headers });
+  if (!response.ok) {
+    // Reuse the shared error handling (401 redirect, message extraction).
+    await handleResponse(response);
+  }
+  return response;
 }
