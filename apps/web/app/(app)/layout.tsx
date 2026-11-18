@@ -1,3 +1,4 @@
+import "./_components/crm.css";
 import { AppShell } from "./_components/app-shell";
 import { AuthGuard } from "./_components/auth-guard";
 

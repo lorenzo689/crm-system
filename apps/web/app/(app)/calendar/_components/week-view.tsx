@@ -14,11 +14,11 @@ type WeekViewProps = {
 
 const GRID_START_HOUR = 7;
 const GRID_END_HOUR = 20;
-const HOUR_HEIGHT = 64;
+const HOUR_HEIGHT = 48;
 const GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 
 const eventStyles: Record<CalendarEventStatus, string> = {
-  SCHEDULED: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  SCHEDULED: "border-blue-200 bg-blue-50 text-blue-900",
   COMPLETED: "border-blue-200 bg-blue-50 text-blue-900",
   CANCELLED: "border-zinc-200 bg-zinc-100 text-zinc-500",
 };
@@ -143,7 +143,7 @@ export function WeekView({
   }
 
   return (
-    <div>
+    <div className="crm-week-view">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
           <button
@@ -176,7 +176,7 @@ export function WeekView({
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-        <div className="min-w-[980px]">
+        <div className="min-w-[650px]">
           <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-zinc-200 bg-zinc-50">
             <div className="border-r border-zinc-200" />
             {days.map((day) => {
@@ -270,7 +270,7 @@ export function WeekView({
                   style={{
                     height: GRID_HEIGHT,
                     backgroundImage:
-                      "repeating-linear-gradient(to bottom, transparent 0, transparent 63px, rgb(228 228 231) 64px)",
+                      "repeating-linear-gradient(to bottom, transparent 0, transparent 47px, rgb(228 228 231) 48px)",
                   }}
                 >
                   {isToday && nowTop >= 0 && nowTop <= GRID_HEIGHT && (

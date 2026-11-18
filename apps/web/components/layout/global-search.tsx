@@ -74,10 +74,23 @@ export function GlobalSearch() {
   const [results, setResults] = useState<SearchResponse>(emptyResults);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
   const router = useRouter();
+
+  useEffect(() => {
+    function onShortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        inputRef.current?.focus();
+      }
+      if (event.key === "Escape") setIsOpen(false);
+    }
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -178,6 +191,7 @@ export function GlobalSearch() {
         </div>
 
         <input
+          ref={inputRef}
           id="global-search"
           name="search"
           type="search"
@@ -188,6 +202,10 @@ export function GlobalSearch() {
           autoComplete="off"
           className="h-full min-w-0 flex-1 rounded-full border-none bg-transparent px-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-400"
         />
+        <span className="crm-search-shortcut" aria-hidden="true">
+          <kbd>Ctrl</kbd>
+          <kbd>K</kbd>
+        </span>
       </form>
 
       {isOpen && (
@@ -195,9 +213,7 @@ export function GlobalSearch() {
           {isLoading ? (
             <p className="px-4 py-3 text-sm text-zinc-400">Suche...</p>
           ) : !hasResults ? (
-            <p className="px-4 py-3 text-sm text-zinc-400">
-              Keine Ergebnisse.
-            </p>
+            <p className="px-4 py-3 text-sm text-zinc-400">Keine Ergebnisse.</p>
           ) : (
             resultCategories.map((category) => {
               const categoryResults = results[category.key];

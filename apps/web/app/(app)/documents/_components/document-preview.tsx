@@ -18,7 +18,7 @@ import {
   type DocumentVersion,
 } from "@/lib/documents";
 import { DocumentAssignment } from "./document-assignment";
-import { TypeBadge } from "./documents-table";
+import { FileIcon } from "./documents-table";
 import { TagInput, withPendingTag } from "./tag-input";
 
 type DocumentPreviewProps = {
@@ -49,9 +49,9 @@ function MetaRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] gap-3 py-2">
-      <dt className="text-xs text-zinc-400">{label}</dt>
-      <dd className="min-w-0 text-sm break-words text-zinc-700">{children}</dd>
+    <div className="grid grid-cols-[100px_1fr] gap-3 py-1">
+      <dt className="text-xs text-slate-600">{label}</dt>
+      <dd className="min-w-0 text-xs break-words text-slate-800">{children}</dd>
     </div>
   );
 }
@@ -251,25 +251,24 @@ export function DocumentPreview({
   const versionCount = versions?.length ?? document._count?.versions ?? 0;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/20">
-      <button
-        type="button"
-        aria-label="Vorschau schließen"
-        onClick={onClose}
-        className="flex-1 cursor-default"
-      />
+    <div className="documents-preview documents-panel">
       <aside
-        role="dialog"
         aria-label={`Vorschau: ${document.title}`}
-        className="flex h-full w-full max-w-xl flex-col border-l border-zinc-200 bg-white"
+        className="flex h-full w-full min-w-0 flex-col"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-4">
-          <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold text-zinc-900">
+        <div className="documents-preview-heading flex items-start gap-3 border-b border-zinc-200 p-4">
+          <FileIcon document={document} />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-base font-semibold text-zinc-900">
               {document.title}
             </h2>
             <div className="mt-1">
-              <TypeBadge type={document.type} />
+              <span className="text-xs text-slate-600">
+                {version?.fileName.split(".").pop()?.toUpperCase() ??
+                  documentTypeLabels[document.type]}
+                {version &&
+                  ` · ${formatFileSize(version.sizeBytes)} · Version ${version.versionNumber}.0`}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -293,7 +292,7 @@ export function DocumentPreview({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="documents-preview-body flex-1 overflow-y-auto p-4">
           {isEditing && (
             <form
               onSubmit={handleSave}
@@ -387,14 +386,14 @@ export function DocumentPreview({
                 <img
                   src={preview.url}
                   alt={document.title}
-                  className="max-h-96 w-full object-contain"
+                  className="h-[230px] w-full object-contain"
                 />
               )}
               {preview.status === "ready" && isPdf && (
                 <iframe
                   src={preview.url}
                   title={document.title}
-                  className="h-96 w-full"
+                  className="h-[230px] w-full"
                 />
               )}
             </div>
@@ -412,7 +411,29 @@ export function DocumentPreview({
             </p>
           )}
 
-          <dl className="divide-y divide-zinc-100">
+          {version && (
+            <div className="documents-preview-actions">
+              {preview.status === "ready" && (
+                <a
+                  href={preview.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="documents-button"
+                >
+                  Vorschau ↗
+                </a>
+              )}
+              <button
+                className="documents-button"
+                onClick={() => handleDownload()}
+                disabled={isDownloading === "current"}
+              >
+                {isDownloading === "current" ? "Lädt …" : "↓ Herunterladen"}
+              </button>
+            </div>
+          )}
+          <h3 className="documents-details-title">Details</h3>
+          <dl>
             <MetaRow label="Zuordnung">
               <DocumentAssignment
                 document={document}
@@ -459,8 +480,8 @@ export function DocumentPreview({
 
           <section className="mt-6" aria-label="Versionen">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                Versionen
+              <h3 className="text-sm font-semibold text-slate-900">
+                Versionsverlauf ({versionCount})
               </h3>
               <button
                 type="button"
@@ -488,7 +509,7 @@ export function DocumentPreview({
               <div className="h-12 animate-pulse rounded-lg bg-zinc-100" />
             )}
             {versions && (
-              <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
+              <ul className="documents-version-history">
                 {versions.map((entry) => (
                   <li
                     key={entry.id}
@@ -528,7 +549,7 @@ export function DocumentPreview({
           </section>
         </div>
 
-        <div className="border-t border-zinc-200 px-6 py-4">
+        <div className="border-t border-zinc-200 p-3">
           {(downloadError || archiveError) && (
             <p className="mb-2 text-sm text-red-600">
               {archiveError ?? downloadError}

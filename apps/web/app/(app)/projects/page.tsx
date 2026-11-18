@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { FiFolder } from "react-icons/fi";
+import type { Task } from "../tasks/_components/task-form-modal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
@@ -9,10 +11,7 @@ import {
   type CustomerOption,
   type Project,
 } from "./_components/project-form-modal";
-import {
-  statusLabels,
-  statusStyles,
-} from "./_components/project-constants";
+import { statusLabels, statusStyles } from "./_components/project-constants";
 
 type ArchiveFilter = "active" | "archived" | "all";
 type StatusFilter = "all" | Project["status"];
@@ -26,6 +25,8 @@ const archiveTabs: { key: ArchiveFilter; label: string }[] = [
 export default function ProjectsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [projectTasks, setProjectTasks] = useState<Task[] | null>(null);
+  const [progressError, setProgressError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,8 +35,7 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [archiveFilter, setArchiveFilter] =
-    useState<ArchiveFilter>("active");
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
@@ -70,6 +70,33 @@ export default function ProjectsPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    apiFetch<Task[]>("/tasks", { signal: controller.signal })
+      .then(setProjectTasks)
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setProgressError(
+            error instanceof Error
+              ? error.message
+              : "Fortschritt konnte nicht geladen werden.",
+          );
+      });
+    return () => controller.abort();
+  }, []);
+  const progressByProject = useMemo(() => {
+    const counts = new Map<string, { total: number; done: number }>();
+    projectTasks?.forEach((task) => {
+      if (!task.project || task.archivedAt || task.status === "CANCELLED")
+        return;
+      const count = counts.get(task.project.id) ?? { total: 0, done: 0 };
+      count.total++;
+      if (task.status === "COMPLETED") count.done++;
+      counts.set(task.project.id, count);
+    });
+    return counts;
+  }, [projectTasks]);
+
   const filteredProjects = useMemo(() => {
     let result = projects;
 
@@ -99,13 +126,7 @@ export default function ProjectsPage() {
     }
 
     return result;
-  }, [
-    archiveFilter,
-    customerFilter,
-    projects,
-    searchQuery,
-    statusFilter,
-  ]);
+  }, [archiveFilter, customerFilter, projects, searchQuery, statusFilter]);
 
   function upsertProject(updatedProject: Project) {
     setProjects((current) => {
@@ -134,35 +155,16 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-end justify-between">
+    <div className="crm-page projects-page">
+      <div className="crm-page-heading flex items-end justify-between">
         <div>
-          <p className="text-xs font-medium tracking-wider text-amber-600">
-            PROJEKTE
+          <h1 className="text-2xl font-semibold text-zinc-900">Projekte</h1>
+          <p className="crm-subtitle">
+            Alle Lichttechnik-Projekte von der Anfrage bis zur Abnahme.
           </p>
-          <h1 className="text-2xl font-semibold text-zinc-900">
-            Projektübersicht
-          </h1>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
-            {archiveTabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setArchiveFilter(tab.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  archiveFilter === tab.key
-                    ? "bg-white text-zinc-900 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-700"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
           <button
             type="button"
             onClick={() => {
@@ -175,7 +177,24 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="crm-tabs">
+        {archiveTabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            aria-pressed={archiveFilter === tab.key}
+            onClick={() => setArchiveFilter(tab.key)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              archiveFilter === tab.key
+                ? "bg-white text-zinc-900 shadow-sm"
+                : "text-zinc-500 hover:text-zinc-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="crm-filter-bar mb-4 flex flex-wrap gap-3">
         <input
           type="text"
           value={searchQuery}
@@ -213,20 +232,29 @@ export default function ProjectsPage() {
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      {progressError && (
+        <p role="status" className="mb-3 text-xs text-amber-700">
+          Aufgabenfortschritt konnte nicht geladen werden.
+        </p>
+      )}
+      <div className="crm-table-container overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wider text-zinc-400">
-              <th className="px-4 py-3 font-medium">Projektnummer</th>
-              <th className="px-4 py-3 font-medium">Projektname</th>
+              <th className="px-4 py-3 font-medium">Projekt</th>
               <th className="px-4 py-3 font-medium">Kunde</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Fortschritt</th>
               <th className="px-4 py-3 font-medium">Verantwortlich</th>
               <th className="px-4 py-3 font-medium">Fällig</th>
             </tr>
           </thead>
           <tbody>
             {filteredProjects.map((project) => {
+              const counts = progressByProject.get(project.id);
+              const progress = counts?.total
+                ? Math.round((counts.done / counts.total) * 100)
+                : null;
               const owner = project.members[0]?.user.displayName ?? "–";
 
               return (
@@ -234,15 +262,18 @@ export default function ProjectsPage() {
                   key={project.id}
                   className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50"
                 >
-                  <td className="px-4 py-3 text-zinc-600">
-                    {project.projectNumber}
-                  </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/projects/${project.id}`}
-                      className="font-medium text-zinc-900 transition hover:text-amber-600 hover:underline"
+                      className="crm-name font-medium text-zinc-900 transition hover:text-amber-600 hover:underline"
                     >
-                      {project.name}
+                      <FiFolder />
+                      <span>
+                        {project.name}
+                        <small className="crm-project-number">
+                          {project.projectNumber}
+                        </small>
+                      </span>
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">
@@ -254,6 +285,32 @@ export default function ProjectsPage() {
                     >
                       {statusLabels[project.status]}
                     </span>
+                  </td>
+                  <td>
+                    {progress !== null && projectTasks ? (
+                      <span
+                        className="crm-project-progress"
+                        title={`${counts?.done} von ${counts?.total} Aufgaben erledigt`}
+                      >
+                        <progress
+                          value={progress}
+                          max={100}
+                          aria-label={`Aufgabenfortschritt ${project.name}`}
+                        />
+                        <span>{progress} %</span>
+                      </span>
+                    ) : (
+                      <span
+                        title={
+                          progressError ??
+                          (projectTasks
+                            ? "Keine auswertbaren Aufgaben"
+                            : "Wird geladen")
+                        }
+                      >
+                        —
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{owner}</td>
                   <td className="px-4 py-3 text-zinc-600">

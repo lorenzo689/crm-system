@@ -50,6 +50,7 @@ export default function CustomersPage() {
     useState<ArchiveFilter>(defaultArchiveFilter);
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>(defaultStatusFilter);
+  const [pagination, setPagination] = useState({ key: "", page: 1 });
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>(defaultSortKey);
   const [sortDirection, setSortDirection] =
@@ -84,9 +85,7 @@ export default function CustomersPage() {
         setCustomers((current) => {
           const exists = current.some((item) => item.id === customer.id);
           return exists
-            ? current.map((item) =>
-                item.id === customer.id ? customer : item,
-              )
+            ? current.map((item) => (item.id === customer.id ? customer : item))
             : [...current, customer];
         });
         setSelectedCustomerId(customer.id);
@@ -154,7 +153,10 @@ export default function CustomersPage() {
       const comparison = (() => {
         switch (sortKey) {
           case "customerNumber":
-            return left.customerNumber.localeCompare(right.customerNumber, "de");
+            return left.customerNumber.localeCompare(
+              right.customerNumber,
+              "de",
+            );
           case "status":
             return statusOrder[left.status] - statusOrder[right.status];
           case "updatedAt":
@@ -248,6 +250,16 @@ export default function CustomersPage() {
     }
   }
 
+  const paginationKey = `${searchQuery}|${statusFilter}|${archiveFilter}|${sortKey}|${sortDirection}`;
+  const pageCount = Math.max(1, Math.ceil(filteredCustomers.length / 7));
+  const currentPage = Math.min(
+    pagination.key === paginationKey ? pagination.page : 1,
+    pageCount,
+  );
+  const visibleCustomers = filteredCustomers.slice(
+    (currentPage - 1) * 7,
+    currentPage * 7,
+  );
   if (isLoading) {
     return <p className="p-8 text-sm text-zinc-400">Lädt...</p>;
   }
@@ -257,17 +269,14 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div
+      className={`crm-page customers-page ${selectedCustomer ? "customer-is-open" : ""}`}
+    >
+      <div className="crm-page-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">
-            KUNDEN
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-zinc-900">
-            Kundenübersicht
-          </h1>
+          <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Kunden</h1>
           <p className="mt-2 text-sm text-zinc-500">
-            {filteredCustomers.length} von {customers.length} Kunden sichtbar
+            Alle Kunden, Kontakte und Projektbeziehungen.
           </p>
         </div>
 
@@ -283,14 +292,31 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.04)]">
+      <nav className="crm-tabs" aria-label="Kundenstatus">
+        {(["all", "ACTIVE", "LEAD", "INACTIVE"] as const).map((value) => (
+          <button
+            key={value}
+            aria-pressed={statusFilter === value}
+            onClick={() => setStatusFilter(value)}
+          >
+            {value === "all" ? "Alle" : statusLabels[value]} (
+            {
+              customers.filter(
+                (c) => !c.archivedAt && (value === "all" || c.status === value),
+              ).length
+            }
+            )
+          </button>
+        ))}
+      </nav>
+      <div className="crm-customer-filters">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row">
             <input
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Kunde, Kundennummer oder Beschreibung suchen..."
+              placeholder="Kunden suchen ..."
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none"
             />
 
@@ -323,7 +349,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="space-y-4 md:hidden">
-        {filteredCustomers.map((customer) => (
+        {visibleCustomers.map((customer) => (
           <article
             key={customer.id}
             className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.04)]"
@@ -392,7 +418,7 @@ export default function CustomersPage() {
         ))}
       </div>
 
-      <div className="hidden overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[0_14px_32px_rgba(15,23,42,0.04)] md:block">
+      <div className="crm-table-container hidden md:block">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
@@ -427,9 +453,10 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.map((customer) => (
+              {visibleCustomers.map((customer) => (
                 <tr
                   key={customer.id}
+                  data-selected={selectedCustomerId === customer.id}
                   className="border-b border-zinc-100 align-top last:border-0 hover:bg-zinc-50"
                 >
                   <td className="px-4 py-4">
@@ -507,6 +534,38 @@ export default function CustomersPage() {
           </p>
         )}
       </div>
+
+      <footer className="crm-pagination">
+        <span>
+          {filteredCustomers.length
+            ? `${(currentPage - 1) * 7 + 1}–${Math.min(currentPage * 7, filteredCustomers.length)}`
+            : "0"}{" "}
+          von {filteredCustomers.length}
+        </span>
+        <div>
+          <button
+            aria-label="Vorherige Seite"
+            disabled={currentPage === 1}
+            onClick={() =>
+              setPagination({ key: paginationKey, page: currentPage - 1 })
+            }
+          >
+            ‹
+          </button>
+          <span>
+            {currentPage} / {pageCount}
+          </span>
+          <button
+            aria-label="Nächste Seite"
+            disabled={currentPage === pageCount}
+            onClick={() =>
+              setPagination({ key: paginationKey, page: currentPage + 1 })
+            }
+          >
+            ›
+          </button>
+        </div>
+      </footer>
 
       <CustomerFormModal
         customer={formMode === "edit" ? selectedCustomer : null}

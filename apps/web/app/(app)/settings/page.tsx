@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FiBell, FiLogOut, FiMonitor, FiSliders } from "react-icons/fi";
+import {
+  FiBell,
+  FiLogOut,
+  FiMonitor,
+  FiSliders,
+  FiSettings,
+  FiBriefcase,
+} from "react-icons/fi";
+import Link from "next/link";
+import { organizationRoleLabels, type CurrentUser } from "@/lib/user-profile";
 import { apiFetch } from "@/lib/auth-api";
 import {
   AppearanceSection,
@@ -29,12 +38,10 @@ type UserSettings = AppearanceSettings &
   };
 
 type SettingsSection =
-  | "appearance"
-  | "notifications"
-  | "behavior"
-  | "session";
+  "general" | "appearance" | "notifications" | "behavior" | "session";
 
 const navigationItems = [
+  { key: "general", label: "Allgemein", icon: FiSettings },
   { key: "appearance", label: "Darstellung", icon: FiMonitor },
   { key: "notifications", label: "Benachrichtigungen", icon: FiBell },
   { key: "behavior", label: "Verhalten", icon: FiSliders },
@@ -42,13 +49,18 @@ const navigationItems = [
 ] as const;
 
 export default function SettingsPage() {
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [userError, setUserError] = useState<string | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [activeSection, setActiveSection] =
-    useState<SettingsSection>("appearance");
+    useState<SettingsSection>("general");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    apiFetch<CurrentUser>("/users/me")
+      .then(setUser)
+      .catch(() => setUserError("Kontodaten konnten nicht geladen werden."));
     apiFetch<UserSettings>("/settings")
       .then(setSettings)
       .catch((caughtError: unknown) =>
@@ -86,18 +98,15 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 sm:p-8">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex items-end justify-between gap-4">
+    <div className="crm-page settings-page">
+      <div className="w-full">
+        <div className="crm-page-heading flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-medium tracking-wider text-amber-600">
-              EINSTELLUNGEN
-            </p>
             <h1 className="text-2xl font-semibold text-zinc-900">
-              Dein Arbeitsbereich
+              Einstellungen
             </h1>
             <p className="mt-1 text-sm text-zinc-500">
-              Passe Ansichten, Verhalten und Benachrichtigungen an.
+              Verwaltung von Arbeitsbereich, Benachrichtigungen und System.
             </p>
           </div>
           <p
@@ -118,7 +127,7 @@ export default function SettingsPage() {
         )}
 
         {settings && (
-          <div className="grid gap-6 md:grid-cols-[210px_minmax(0,1fr)]">
+          <div className="crm-settings-layout">
             <nav
               aria-label="Einstellungsbereiche"
               className="flex gap-1 overflow-x-auto rounded-xl border border-zinc-200 bg-white p-2 md:block md:self-start"
@@ -131,6 +140,7 @@ export default function SettingsPage() {
                   <button
                     key={item.key}
                     type="button"
+                    aria-pressed={isActive}
                     onClick={() => setActiveSection(item.key)}
                     className={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition md:mb-1 md:w-full md:last:mb-0 ${
                       isActive
@@ -145,7 +155,144 @@ export default function SettingsPage() {
               })}
             </nav>
 
-            <section className="min-h-[430px] rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-7">
+            <section
+              className={`crm-settings-content ${activeSection === "general" ? "is-general" : "crm-card"}`}
+            >
+              {activeSection === "general" && (
+                <div className="crm-settings-general">
+                  <section className="crm-card">
+                    <div className="crm-section-heading">
+                      <h2>Arbeitsbereich & Konto</h2>
+                      <Link className="crm-outline-button" href="/profile">
+                        Bearbeiten
+                      </Link>
+                    </div>
+                    {userError ? (
+                      <p role="alert" className="text-red-600">
+                        {userError}
+                      </p>
+                    ) : user ? (
+                      <>
+                        <div className="crm-organization">
+                          <span className="crm-icon-disc">
+                            <FiBriefcase />
+                          </span>
+                          <div>
+                            <strong>{user.organizationName}</strong>
+                            <p>
+                              {organizationRoleLabels[user.organizationRole]}
+                            </p>
+                          </div>
+                        </div>
+                        <dl className="crm-account-details">
+                          <dt>Name</dt>
+                          <dd>{user.displayName}</dd>
+                          <dt>E-Mail</dt>
+                          <dd>{user.email}</dd>
+                          <dt>Mitglied seit</dt>
+                          <dd>
+                            {new Date(user.createdAt).toLocaleDateString(
+                              "de-DE",
+                            )}
+                          </dd>
+                        </dl>
+                      </>
+                    ) : (
+                      <p className="crm-empty">Kontodaten werden geladen ...</p>
+                    )}
+                  </section>
+                  <section className="crm-card crm-system-settings">
+                    <h2>System</h2>
+                    <label>
+                      Erscheinungsbild
+                      <select
+                        disabled={isSaving}
+                        value={settings.theme}
+                        onChange={(event) =>
+                          void updateSettings({
+                            theme: event.target.value as UserSettings["theme"],
+                          })
+                        }
+                      >
+                        <option value="LIGHT">Hell</option>
+                        <option value="DARK">Dunkel</option>
+                        <option value="SYSTEM">System</option>
+                      </select>
+                    </label>
+                    <label>
+                      Startseite
+                      <select
+                        disabled={isSaving}
+                        value={settings.defaultLandingPage}
+                        onChange={(event) =>
+                          void updateSettings({
+                            defaultLandingPage: event.target
+                              .value as UserSettings["defaultLandingPage"],
+                          })
+                        }
+                      >
+                        <option value="DASHBOARD">Übersicht</option>
+                        <option value="TASKS">Aufgaben</option>
+                        <option value="CALENDAR">Kalender</option>
+                        <option value="PROJECTS">Projekte</option>
+                      </select>
+                    </label>
+                    <label>
+                      Kalenderansicht
+                      <select
+                        disabled={isSaving}
+                        value={settings.calendarDefaultView}
+                        onChange={(event) =>
+                          void updateSettings({
+                            calendarDefaultView: event.target
+                              .value as UserSettings["calendarDefaultView"],
+                          })
+                        }
+                      >
+                        <option value="AGENDA">Agenda</option>
+                        <option value="MONTH">Monat</option>
+                      </select>
+                    </label>
+                    <label>
+                      Kompakte Tabellenansicht
+                      <button
+                        className="crm-switch"
+                        role="switch"
+                        aria-checked={settings.density === "COMPACT"}
+                        aria-label="Kompakte Tabellenansicht"
+                        disabled={isSaving}
+                        onClick={() =>
+                          void updateSettings({
+                            density:
+                              settings.density === "COMPACT"
+                                ? "COMFORTABLE"
+                                : "COMPACT",
+                          })
+                        }
+                      >
+                        <span />
+                      </button>
+                    </label>
+                    <label>
+                      Erledigte Aufgaben anzeigen
+                      <button
+                        className="crm-switch"
+                        role="switch"
+                        aria-checked={settings.showCompletedTasks}
+                        aria-label="Erledigte Aufgaben anzeigen"
+                        disabled={isSaving}
+                        onClick={() =>
+                          void updateSettings({
+                            showCompletedTasks: !settings.showCompletedTasks,
+                          })
+                        }
+                      >
+                        <span />
+                      </button>
+                    </label>
+                  </section>
+                </div>
+              )}
               {activeSection === "appearance" && (
                 <AppearanceSection
                   settings={settings}

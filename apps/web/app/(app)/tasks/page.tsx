@@ -73,17 +73,14 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus>(
+  const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus>("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>(
     "all",
   );
-  const [priorityFilter, setPriorityFilter] = useState<
-    "all" | TaskPriority
-  >("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
-  const [archiveFilter, setArchiveFilter] =
-    useState<ArchiveFilter>("active");
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -258,9 +255,7 @@ export default function TasksPage() {
     setTasks((current) => {
       const exists = current.some((task) => task.id === savedTask.id);
       return exists
-        ? current.map((task) =>
-            task.id === savedTask.id ? savedTask : task,
-          )
+        ? current.map((task) => (task.id === savedTask.id ? savedTask : task))
         : [...current, savedTask];
     });
   }
@@ -405,37 +400,43 @@ export default function TasksPage() {
   }
 
   const { startOfToday, endOfToday } = getDayBounds();
+  const endOfWeek = new Date(startOfToday);
+  endOfWeek.setDate(endOfWeek.getDate() + (7 - ((endOfWeek.getDay() + 6) % 7)));
+  const taskGroups = [
+    {
+      label: "Heute & überfällig",
+      items: filteredTasks.filter(
+        (t) => t.dueAt && new Date(t.dueAt) < endOfToday,
+      ),
+    },
+    {
+      label: "Diese Woche",
+      items: filteredTasks.filter(
+        (t) =>
+          t.dueAt &&
+          new Date(t.dueAt) >= endOfToday &&
+          new Date(t.dueAt) < endOfWeek,
+      ),
+    },
+    {
+      label: "Später & ohne Termin",
+      items: filteredTasks.filter(
+        (t) => !t.dueAt || new Date(t.dueAt) >= endOfWeek,
+      ),
+    },
+  ];
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-end justify-between">
+    <div className="crm-page tasks-page">
+      <div className="crm-page-heading flex items-end justify-between">
         <div>
-          <p className="text-xs font-medium tracking-wider text-amber-600">
-            AUFGABEN
+          <h1 className="text-2xl font-semibold text-zinc-900">Aufgaben</h1>
+          <p className="crm-subtitle">
+            Alle Aufgaben für Projekte, Angebote und den Vertrieb.
           </p>
-          <h1 className="text-2xl font-semibold text-zinc-900">
-            Aufgabenübersicht
-          </h1>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
-            {archiveTabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setArchiveFilter(tab.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  archiveFilter === tab.key
-                    ? "bg-white text-zinc-900 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-700"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
           <button
             type="button"
             onClick={() => {
@@ -449,284 +450,372 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <form onSubmit={handleQuickAdd} className="mb-4">
-        <input
-          ref={quickInputRef}
-          type="text"
-          value={quickTitle}
-          onChange={(event) => setQuickTitle(event.target.value)}
-          placeholder="Neue Aufgabe … (Enter zum Anlegen)"
-          maxLength={200}
-          aria-label="Neue Aufgabe"
-          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none"
-        />
-        {quickError && (
-          <p className="mt-1 text-sm text-red-600">{quickError}</p>
+      <nav className="crm-tabs" aria-label="Aufgabenansicht">
+        <button
+          aria-pressed={
+            !!currentUser &&
+            assigneeFilter === currentUser.id &&
+            statusFilter !== "COMPLETED"
+          }
+          onClick={() => {
+            if (currentUser) {
+              setAssigneeFilter(currentUser.id);
+              setStatusFilter("all");
+              setHideCompleted(true);
+            }
+          }}
+        >
+          Meine (
+          {
+            tasks.filter(
+              (t) =>
+                !t.archivedAt &&
+                isOpenStatus(t.status) &&
+                t.assignments.some((a) => a.userId === currentUser?.id),
+            ).length
+          }
+          )
+        </button>
+        <button
+          aria-pressed={
+            assigneeFilter === "all" && statusFilter !== "COMPLETED"
+          }
+          onClick={() => {
+            setAssigneeFilter("all");
+            setStatusFilter("all");
+            setHideCompleted(true);
+          }}
+        >
+          Team (
+          {tasks.filter((t) => !t.archivedAt && isOpenStatus(t.status)).length})
+        </button>
+        <button
+          aria-pressed={statusFilter === "COMPLETED"}
+          onClick={() => {
+            setStatusFilter("COMPLETED");
+            setAssigneeFilter("all");
+            setHideCompleted(false);
+          }}
+        >
+          Erledigt (
+          {
+            tasks.filter((t) => !t.archivedAt && t.status === "COMPLETED")
+              .length
+          }
+          )
+        </button>
+      </nav>
+      <details className="crm-task-tools">
+        <summary>Suche, Filter & Schnellerfassung</summary>
+        <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
+          {archiveTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setArchiveFilter(tab.key)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                archiveFilter === tab.key
+                  ? "bg-white text-zinc-900 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>{" "}
+        <form onSubmit={handleQuickAdd} className="mb-4">
+          <input
+            ref={quickInputRef}
+            type="text"
+            value={quickTitle}
+            onChange={(event) => setQuickTitle(event.target.value)}
+            placeholder="Neue Aufgabe … (Enter zum Anlegen)"
+            maxLength={200}
+            aria-label="Neue Aufgabe"
+            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none"
+          />
+          {quickError && (
+            <p className="mt-1 text-sm text-red-600">{quickError}</p>
+          )}
+        </form>
+        {actionError && (
+          <p className="mb-3 text-sm text-red-600">{actionError}</p>
         )}
-      </form>
+        <div className="crm-filter-bar mb-4 flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Aufgabe suchen…"
+            className="w-full max-w-xs rounded-lg border border-zinc-200 px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none"
+          />
 
-      {actionError && (
-        <p className="mb-3 text-sm text-red-600">{actionError}</p>
-      )}
+          {currentUser && (
+            <button
+              type="button"
+              aria-pressed={assigneeFilter === currentUser.id}
+              onClick={() =>
+                setAssigneeFilter((current) =>
+                  current === currentUser.id ? "all" : currentUser.id,
+                )
+              }
+              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                assigneeFilter === currentUser.id
+                  ? "border-amber-400 bg-amber-50 text-amber-800"
+                  : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              Meine Aufgaben
+            </button>
+          )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Aufgabe suchen…"
-          className="w-full max-w-xs rounded-lg border border-zinc-200 px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none"
-        />
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as typeof statusFilter)
+            }
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
+          >
+            <option value="all">Alle Status</option>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
 
-        {currentUser && (
+          <select
+            value={priorityFilter}
+            onChange={(event) =>
+              setPriorityFilter(event.target.value as typeof priorityFilter)
+            }
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
+          >
+            <option value="all">Alle Prioritäten</option>
+            {Object.entries(priorityLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={projectFilter}
+            onChange={(event) => setProjectFilter(event.target.value)}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
+          >
+            <option value="all">Alle Projekte</option>
+            <option value="none">Ohne Projekt</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={assigneeFilter}
+            onChange={(event) => setAssigneeFilter(event.target.value)}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
+          >
+            <option value="all">Alle Verantwortlichen</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.displayName}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={dueFilter}
+            onChange={(event) => setDueFilter(event.target.value as DueFilter)}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
+          >
+            <option value="all">Alle Fälligkeiten</option>
+            <option value="overdue">Überfällig</option>
+            <option value="today">Heute fällig</option>
+            <option value="upcoming">Bevorstehend</option>
+          </select>
+
+          <label className="flex items-center gap-2 text-sm text-zinc-600">
+            <input
+              type="checkbox"
+              checked={hideCompleted}
+              onChange={(event) => setHideCompleted(event.target.checked)}
+            />
+            Erledigte ausblenden
+          </label>
+
           <button
             type="button"
-            aria-pressed={assigneeFilter === currentUser.id}
-            onClick={() =>
-              setAssigneeFilter((current) =>
-                current === currentUser.id ? "all" : currentUser.id,
-              )
-            }
-            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-              assigneeFilter === currentUser.id
-                ? "border-amber-400 bg-amber-50 text-amber-800"
-                : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-            }`}
+            onClick={resetFilters}
+            className="text-sm text-zinc-500 hover:text-zinc-700 hover:underline"
           >
-            Meine Aufgaben
+            Filter zurücksetzen
           </button>
-        )}
-
-        <select
-          value={statusFilter}
-          onChange={(event) =>
-            setStatusFilter(event.target.value as typeof statusFilter)
-          }
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
-        >
-          <option value="all">Alle Status</option>
-          {Object.entries(statusLabels).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={priorityFilter}
-          onChange={(event) =>
-            setPriorityFilter(event.target.value as typeof priorityFilter)
-          }
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
-        >
-          <option value="all">Alle Prioritäten</option>
-          {Object.entries(priorityLabels).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={projectFilter}
-          onChange={(event) => setProjectFilter(event.target.value)}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
-        >
-          <option value="all">Alle Projekte</option>
-          <option value="none">Ohne Projekt</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={assigneeFilter}
-          onChange={(event) => setAssigneeFilter(event.target.value)}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
-        >
-          <option value="all">Alle Verantwortlichen</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.displayName}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={dueFilter}
-          onChange={(event) => setDueFilter(event.target.value as DueFilter)}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 focus:border-amber-400 focus:outline-none"
-        >
-          <option value="all">Alle Fälligkeiten</option>
-          <option value="overdue">Überfällig</option>
-          <option value="today">Heute fällig</option>
-          <option value="upcoming">Bevorstehend</option>
-        </select>
-
-        <label className="flex items-center gap-2 text-sm text-zinc-600">
-          <input
-            type="checkbox"
-            checked={hideCompleted}
-            onChange={(event) => setHideCompleted(event.target.checked)}
-          />
-          Erledigte ausblenden
-        </label>
-
-        <button
-          type="button"
-          onClick={resetFilters}
-          className="text-sm text-zinc-500 hover:text-zinc-700 hover:underline"
-        >
-          Filter zurücksetzen
-        </button>
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wider text-zinc-400">
-              <th className="w-10 px-4 py-3 font-medium">
-                <span className="sr-only">Erledigt</span>
-              </th>
-              <th className="px-4 py-3 font-medium">Titel</th>
-              <th className="px-4 py-3 font-medium">Projekt</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Priorität</th>
-              <th className="px-4 py-3 font-medium">Verantwortlich</th>
-              <th className="px-4 py-3 font-medium">Fällig</th>
-              <th className="px-4 py-3 font-medium">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTasks.map((task) => {
-              const responsible =
-                task.assignments.find(
-                  (assignment) => assignment.role === "RESPONSIBLE",
-                )?.user.displayName ?? "–";
-              const isDone = task.status === "COMPLETED";
-              const due = task.dueAt ? new Date(task.dueAt) : null;
-              const isOverdue =
-                due !== null && due < startOfToday && isOpenStatus(task.status);
-              const isDueToday =
-                due !== null &&
-                due >= startOfToday &&
-                due < endOfToday &&
-                isOpenStatus(task.status);
-
-              return (
-                <tr
-                  key={task.id}
-                  data-overdue={isOverdue || undefined}
-                  data-highlighted={task.id === highlightedTaskId || undefined}
-                  className={`border-b border-zinc-100 transition-colors duration-700 last:border-0 hover:bg-zinc-50 ${
-                    task.id === highlightedTaskId ? "bg-amber-50" : ""
-                  }`}
-                >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={isDone}
-                      disabled={task.status === "CANCELLED"}
-                      onChange={() => handleToggleDone(task)}
-                      aria-label={
-                        isDone
-                          ? `„${task.title}“ wieder öffnen`
-                          : `„${task.title}“ erledigen`
-                      }
-                      className="h-4 w-4 cursor-pointer accent-emerald-600"
-                    />
-                  </td>
-                  <td
-                    className={`px-4 py-3 font-medium ${
-                      isDone ? "text-zinc-400 line-through" : "text-zinc-900"
-                    }`}
-                  >
-                    {task.title}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600">
-                    {task.project && (
-                      <Link
-                        href={`/projects/${task.project.id}`}
-                        className="hover:text-zinc-900 hover:underline"
-                      >
-                        {task.project.name}
-                      </Link>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[task.status]}`}
-                    >
-                      {statusLabels[task.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600">
-                    {priorityLabels[task.priority]}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600">
-                    {responsible}
-                  </td>
-                  <td
-                    className={`px-4 py-3 ${
-                      isOverdue
-                        ? "font-medium text-red-600"
-                        : isDueToday
-                          ? "font-medium text-amber-700"
-                          : "text-zinc-600"
-                    }`}
-                  >
-                    {due ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        {isOverdue && (
-                          <span
-                            title="Überfällig"
-                            className="inline-block h-2 w-2 rounded-full bg-red-600"
-                          />
-                        )}
-                        {due.toLocaleDateString("de-DE")}
-                        {isDueToday && (
-                          <span className="text-xs font-normal">heute</span>
-                        )}
-                      </span>
-                    ) : (
-                      "–"
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTask(task);
-                          setIsModalOpen(true);
-                        }}
-                        className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
-                      >
-                        Bearbeiten
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveToggle(task)}
-                        className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
-                      >
-                        {task.archivedAt ? "Wiederherstellen" : "Archivieren"}
-                      </button>
-                    </div>
-                  </td>
+        </div>
+      </details>
+      {taskGroups.map((group) => (
+        <details key={group.label} className="crm-task-group" open>
+          <summary>
+            {group.label} ({group.items.length})
+          </summary>
+          <div className="crm-table-container overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wider text-zinc-400">
+                  <th className="w-10 px-4 py-3 font-medium">
+                    <span className="sr-only">Erledigt</span>
+                  </th>
+                  <th className="px-4 py-3 font-medium">Titel</th>
+                  <th className="px-4 py-3 font-medium">Projekt</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Priorität</th>
+                  <th className="px-4 py-3 font-medium">Verantwortlich</th>
+                  <th className="px-4 py-3 font-medium">Fällig</th>
+                  <th className="px-4 py-3 font-medium">Aktionen</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {group.items.map((task) => {
+                  const responsible =
+                    task.assignments.find(
+                      (assignment) => assignment.role === "RESPONSIBLE",
+                    )?.user.displayName ?? "–";
+                  const isDone = task.status === "COMPLETED";
+                  const due = task.dueAt ? new Date(task.dueAt) : null;
+                  const isOverdue =
+                    due !== null &&
+                    due < startOfToday &&
+                    isOpenStatus(task.status);
+                  const isDueToday =
+                    due !== null &&
+                    due >= startOfToday &&
+                    due < endOfToday &&
+                    isOpenStatus(task.status);
 
-        {filteredTasks.length === 0 && (
-          <p className="p-8 text-center text-sm text-zinc-400">
-            Keine Aufgaben gefunden.
-          </p>
-        )}
-      </div>
+                  return (
+                    <tr
+                      key={task.id}
+                      data-overdue={isOverdue || undefined}
+                      data-highlighted={
+                        task.id === highlightedTaskId || undefined
+                      }
+                      className={`border-b border-zinc-100 transition-colors duration-700 last:border-0 hover:bg-zinc-50 ${
+                        task.id === highlightedTaskId ? "bg-amber-50" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isDone}
+                          disabled={task.status === "CANCELLED"}
+                          onChange={() => handleToggleDone(task)}
+                          aria-label={
+                            isDone
+                              ? `„${task.title}“ wieder öffnen`
+                              : `„${task.title}“ erledigen`
+                          }
+                          className="h-4 w-4 cursor-pointer accent-emerald-600"
+                        />
+                      </td>
+                      <td
+                        className={`px-4 py-3 font-medium ${
+                          isDone
+                            ? "text-zinc-400 line-through"
+                            : "text-zinc-900"
+                        }`}
+                      >
+                        {task.title}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {task.project && (
+                          <Link
+                            href={`/projects/${task.project.id}`}
+                            className="hover:text-zinc-900 hover:underline"
+                          >
+                            {task.project.name}
+                          </Link>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[task.status]}`}
+                        >
+                          {statusLabels[task.status]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        <span
+                          className={`crm-priority crm-priority-${task.priority.toLowerCase()}`}
+                        >
+                          {priorityLabels[task.priority]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">{responsible}</td>
+                      <td
+                        className={`px-4 py-3 ${
+                          isOverdue
+                            ? "font-medium text-red-600"
+                            : isDueToday
+                              ? "font-medium text-amber-700"
+                              : "text-zinc-600"
+                        }`}
+                      >
+                        {due ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            {isOverdue && (
+                              <span
+                                title="Überfällig"
+                                className="inline-block h-2 w-2 rounded-full bg-red-600"
+                              />
+                            )}
+                            {due.toLocaleDateString("de-DE")}
+                            {isDueToday && (
+                              <span className="text-xs font-normal">heute</span>
+                            )}
+                          </span>
+                        ) : (
+                          "–"
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setIsModalOpen(true);
+                            }}
+                            className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
+                          >
+                            Bearbeiten
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleArchiveToggle(task)}
+                            className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline"
+                          >
+                            {task.archivedAt
+                              ? "Wiederherstellen"
+                              : "Archivieren"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {group.items.length === 0 && (
+              <p className="p-8 text-center text-sm text-zinc-400">
+                Keine Aufgaben gefunden.
+              </p>
+            )}
+          </div>
+        </details>
+      ))}
 
       <TaskFormModal
         isOpen={isModalOpen}
