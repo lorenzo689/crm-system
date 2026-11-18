@@ -14,7 +14,10 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ProjectWrite, ProjectWriteGuard } from '../access/project-write.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import {
@@ -28,7 +31,7 @@ import {
 } from './dto/sales-document.dto';
 import { SalesDocumentsService } from './sales-documents.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ProjectWriteGuard)
 @Controller('sales-documents')
 export class SalesDocumentsController {
   constructor(
@@ -53,6 +56,8 @@ export class SalesDocumentsController {
     return this.service.findAll(organizationId, query);
   }
 
+  // Revenue and open-amount key figures: owners and admins only.
+  @Roles('OWNER', 'ADMIN')
   @Get('summary')
   async summary(@Req() req: Request) {
     const { organizationId } = await this.scope(req);
@@ -65,12 +70,14 @@ export class SalesDocumentsController {
     return this.service.findOne(id, organizationId);
   }
 
+  @ProjectWrite({ bodyField: 'projectId' })
   @Post()
   async create(@Body() dto: CreateSalesDocumentDto, @Req() req: Request) {
     const { organizationId, userId } = await this.scope(req);
     return this.service.create(organizationId, userId, dto);
   }
 
+  @ProjectWrite({ entity: 'salesDocument', bodyField: 'projectId' })
   @Patch(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -81,6 +88,7 @@ export class SalesDocumentsController {
     return this.service.update(id, organizationId, dto);
   }
 
+  @ProjectWrite({ entity: 'salesDocument' })
   @Post(':id/status')
   async changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
@@ -91,12 +99,14 @@ export class SalesDocumentsController {
     return this.service.changeStatus(id, organizationId, userId, dto.status);
   }
 
+  @ProjectWrite({ entity: 'salesDocument' })
   @Post(':id/convert-to-invoice')
   async convert(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const { organizationId, userId } = await this.scope(req);
     return this.service.convertQuoteToInvoice(id, organizationId, userId);
   }
 
+  @ProjectWrite({ entity: 'salesDocument' })
   @Post(':id/payments')
   async addPayment(
     @Param('id', ParseUUIDPipe) id: string,
@@ -107,6 +117,7 @@ export class SalesDocumentsController {
     return this.service.addPayment(id, organizationId, userId, dto);
   }
 
+  @ProjectWrite({ entity: 'salesDocument' })
   @Post(':id/credit-note')
   async creditNote(
     @Param('id', ParseUUIDPipe) id: string,
@@ -117,6 +128,7 @@ export class SalesDocumentsController {
     return this.service.createCreditNote(id, organizationId, userId, dto);
   }
 
+  @ProjectWrite({ entity: 'salesDocument' })
   @Post(':id/dunning')
   async dunning(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const { organizationId, userId } = await this.scope(req);
@@ -162,6 +174,7 @@ export class SalesDocumentsController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ProjectWrite({ entity: 'salesDocument' })
   @Post(':id/send')
   async send(
     @Param('id', ParseUUIDPipe) id: string,
@@ -172,6 +185,7 @@ export class SalesDocumentsController {
     return this.service.sendByEmail(id, organizationId, userId, dto);
   }
 
+  @ProjectWrite({ entity: 'salesDocument' })
   @Delete(':id')
   async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const { organizationId } = await this.scope(req);

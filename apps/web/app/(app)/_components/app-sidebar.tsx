@@ -16,6 +16,7 @@ import {
   SIDEBAR_OPEN_WIDTH,
 } from "./app-utils";
 import { apiFetch } from "@/lib/auth-api";
+import { isAdminRole } from "@/lib/use-current-user";
 import {
   getUserInitials,
   organizationRoleLabels,
@@ -105,7 +106,9 @@ export function AppSidebar({ isOpen, onToggleSidebar }: AppSidebarProps) {
         )}
       >
         <ul className="space-y-0.5">
-          {menuItems.map((item) => (
+          {menuItems
+            .filter((item) => !item.adminOnly || isAdminRole(user?.organizationRole))
+            .map((item) => (
             <SidebarMenuItem
               key={item.href}
               item={item}

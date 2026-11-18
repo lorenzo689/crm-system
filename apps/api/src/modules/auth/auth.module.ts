@@ -1,7 +1,12 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthMailService } from './auth-mail.service';
-import { getJwtSecret } from './jwt-secret';
+import {
+  getJwtExpiresInSeconds,
+  getJwtSecret,
+  JWT_ALGORITHM,
+} from './auth-config';
+import { RolesGuard } from './guards/roles.guard';
 import { JwtStrategy } from './strategies/jwt.strategies';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -10,12 +15,15 @@ import { AuthController } from './auth.controller';
   imports: [
     JwtModule.register({
       secret: getJwtSecret(),
-      signOptions: { expiresIn: '12h', algorithm: 'HS256' },
-      verifyOptions: { algorithms: ['HS256'] },
+      signOptions: {
+        expiresIn: getJwtExpiresInSeconds(),
+        algorithm: JWT_ALGORITHM,
+      },
+      verifyOptions: { algorithms: [JWT_ALGORITHM] },
     }),
   ],
-  providers: [JwtStrategy, AuthMailService, AuthService],
+  providers: [JwtStrategy, AuthMailService, AuthService, RolesGuard],
   controllers: [AuthController],
-  exports: [JwtModule],
+  exports: [JwtModule, RolesGuard],
 })
 export class AuthModule {}

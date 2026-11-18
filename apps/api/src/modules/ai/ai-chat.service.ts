@@ -4,7 +4,8 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { AI_TOOLS, AiToolsService } from './ai-tools';
+import type { OrganizationMemberRole } from '../../../generated/prisma/client';
+import { AiToolsService, toolsForRole } from './ai-tools';
 
 const MAX_TOOL_ROUNDS = 8;
 const DEFAULT_MODEL = 'claude-opus-5-5';
@@ -135,7 +136,12 @@ export class AiChatService {
 
   async chat(
     history: ChatTurn[],
-    ctx: { organizationId: string; userId: string; userName: string },
+    ctx: {
+      organizationId: string;
+      userId: string;
+      role: OrganizationMemberRole;
+      userName: string;
+    },
     onEvent?: (event: ChatEvent) => void,
   ) {
     const client = this.getClient();
@@ -168,7 +174,7 @@ export class AiChatService {
             cache_control: { type: 'ephemeral' },
           },
         ],
-        tools: AI_TOOLS,
+        tools: toolsForRole(ctx.role),
         messages,
       });
 

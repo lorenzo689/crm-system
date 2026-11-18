@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AccessService } from '../access/access.service';
 import { ActivitiesService } from '../activities/activities.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
@@ -15,6 +16,7 @@ export class NotesService {
     private readonly notesRepository: NotesRepository,
     private readonly prisma: PrismaService,
     private readonly activitiesService: ActivitiesService,
+    private readonly access: AccessService,
   ) {}
 
   private assertHasContext(dto: CreateNoteDto) {
@@ -89,13 +91,11 @@ export class NotesService {
     return note;
   }
 
-  async create(
-    organizationId: string,
-    authorId: string,
-    dto: CreateNoteDto,
-  ) {
+  async create(organizationId: string, authorId: string, dto: CreateNoteDto) {
     this.assertHasContext(dto);
     await this.assertContextExists(organizationId, dto);
+    await this.access.assertProjectWritable(dto.projectId, authorId);
+    await this.access.assertTaskWritable(dto.taskId, authorId);
 
     const note = await this.notesRepository.create({
       ...dto,
@@ -114,13 +114,28 @@ export class NotesService {
     return note;
   }
 
-  async update(id: string, organizationId: string, dto: UpdateNoteDto) {
-    await this.findOne(id, organizationId);
+  private async assertWritable(
+    note: { projectId: string | null; taskId: string | null },
+    userId: string,
+  ) {
+    await this.access.assertProjectWritable(note.projectId, userId);
+    await this.access.assertTaskWritable(note.taskId, userId);
+  }
+
+  async update(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+    dto: UpdateNoteDto,
+  ) {
+    const note = await this.findOne(id, organizationId);
+    await this.assertWritable(note, actorUserId);
     return this.notesRepository.update(id, dto);
   }
 
-  async archive(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
+  async archive(id: string, organizationId: string, actorUserId: string) {
+    const note = await this.findOne(id, organizationId);
+    await this.assertWritable(note, actorUserId);
     return this.notesRepository.archive(id);
   }
 }

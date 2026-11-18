@@ -14,7 +14,9 @@ import { Throttle } from '@nestjs/throttler';
 import { IsEnum, IsOptional } from 'class-validator';
 import type { Request } from 'express';
 import { InboundEmailStatus } from '../../../generated/prisma/enums';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import { InboxService } from './inbox.service';
@@ -30,7 +32,9 @@ class UpdateInboxStatusDto {
   status!: InboundEmailStatus;
 }
 
-@UseGuards(JwtAuthGuard)
+// Finance-sensitive: owners and admins only until the business decides otherwise.
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('OWNER', 'ADMIN')
 @Controller('inbox')
 export class InboxController {
   constructor(

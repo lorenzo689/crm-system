@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, apiFetchRaw } from "@/lib/auth-api";
+import { useCurrentUser } from "@/lib/use-current-user";
 import { invalidateApi } from "@/lib/use-api";
 
 type Proposal = {
@@ -82,6 +83,7 @@ export default function AssistantPage() {
 }
 
 function Assistant() {
+  const { isAdmin } = useCurrentUser();
   const searchParams = useSearchParams();
   const initialQuestion = searchParams.get("q");
   const [status, setStatus] = useState<AiStatus | null>(null);
@@ -99,12 +101,14 @@ function Assistant() {
   const sentInitial = useRef(false);
 
   const loadProposals = useCallback(async () => {
+    // Proposals are approved by owners and admins only (the API answers 403).
+    if (!isAdmin) return;
     try {
       setProposals(await apiFetch<Proposal[]>("/ai/proposals"));
     } catch {
       /* the inbox is optional UI; the chat error state covers failures */
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     apiFetch<AiStatus>("/ai/status").then(setStatus).catch(() => undefined);
@@ -319,14 +323,16 @@ function Assistant() {
               {pending.length}
             </span>
           </h2>
-          <button
-            type="button"
-            onClick={() => void runAgents()}
-            disabled={isRunningAgents}
-            className="text-xs text-zinc-500 hover:text-zinc-900 disabled:opacity-50"
-          >
-            {isRunningAgents ? "Prüft…" : "Jetzt prüfen"}
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => void runAgents()}
+              disabled={isRunningAgents}
+              className="text-xs text-zinc-500 hover:text-zinc-900 disabled:opacity-50"
+            >
+              {isRunningAgents ? "Prüft…" : "Jetzt prüfen"}
+            </button>
+          )}
         </div>
 
         {pending.length === 0 && (

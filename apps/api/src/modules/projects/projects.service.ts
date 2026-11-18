@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import type { ProjectMemberRole } from '../../../generated/prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AccessService, type Tx } from '../access/access.service';
+import type { AuthUser } from '../auth/strategies/jwt.strategies';
 import { ActivitiesService } from '../activities/activities.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -19,6 +21,7 @@ export class ProjectsService {
     private readonly projectsRepository: ProjectsRepository,
     private readonly prisma: PrismaService,
     private readonly activitiesService: ActivitiesService,
+    private readonly access: AccessService,
   ) {}
 
   private async assertCustomerExists(
@@ -84,6 +87,7 @@ export class ProjectsService {
     dto: UpdateProjectDto,
   ) {
     const existingProject = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(id, actorUserId);
 
     if (
       dto.projectNumber &&
@@ -134,6 +138,7 @@ export class ProjectsService {
 
   async archive(id: string, organizationId: string, actorUserId: string) {
     const project = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(id, actorUserId);
     const archived = await this.projectsRepository.archive(id);
 
     await this.activitiesService.log({
@@ -146,8 +151,9 @@ export class ProjectsService {
     return archived;
   }
 
-  async unarchive(id: string, organizationId: string) {
+  async unarchive(id: string, organizationId: string, actorUserId: string) {
     await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(id, actorUserId);
     return this.projectsRepository.unarchive(id);
   }
 
@@ -156,59 +162,99 @@ export class ProjectsService {
     return this.projectsRepository.findStatusHistory(id);
   }
 
+  /**
+   * Membership management runs in an admin transaction (shared organization
+   * lock): the acting user is re-validated under the lock, so an admin whose
+   * rights were withdrawn meanwhile cannot still change memberships.
+   */
+  private asAdmin<T>(
+    actor: AuthUser,
+    action: (tx: Tx) => Promise<T>,
+  ): Promise<T> {
+    return this.access.runAsAdmin(
+      {
+        userId: actor.sub,
+        organizationId: actor.organizationId,
+        tokenVersion: actor.tokenVersion,
+      },
+      (tx) => action(tx),
+    );
+  }
+
+  private async findProjectIn(tx: Tx, id: string, organizationId: string) {
+    const project = await tx.project.findFirst({
+      where: { id, organizationId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+  }
+
   async addMember(
+    actor: AuthUser,
     projectId: string,
-    organizationId: string,
     userId: string,
     role: ProjectMemberRole,
   ) {
-    await this.findOne(projectId, organizationId);
-
-    const existing = await this.projectsRepository.findMember(
-      projectId,
-      userId,
-    );
-    if (existing) {
-      throw new ConflictException('User is already a member of this project');
-    }
-
-    return this.projectsRepository.addMember(projectId, userId, role);
+    return this.asAdmin(actor, async (tx) => {
+      await this.findProjectIn(tx, projectId, actor.organizationId);
+      await this.access.assertActiveOrganizationMember(
+        actor.organizationId,
+        userId,
+        tx,
+      );
+      const existing = await tx.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      });
+      if (existing) {
+        throw new ConflictException('User is already a member of this project');
+      }
+      return tx.projectMember.create({
+        data: { projectId, userId, role },
+        include: {
+          user: { select: { id: true, displayName: true, email: true } },
+        },
+      });
+    });
   }
 
   async updateMemberRole(
+    actor: AuthUser,
     projectId: string,
-    organizationId: string,
     userId: string,
     role: ProjectMemberRole,
   ) {
-    await this.findOne(projectId, organizationId);
-
-    const existing = await this.projectsRepository.findMember(
-      projectId,
-      userId,
-    );
-    if (!existing) {
-      throw new NotFoundException('Member not found');
-    }
-
-    return this.projectsRepository.updateMemberRole(projectId, userId, role);
+    return this.asAdmin(actor, async (tx) => {
+      await this.findProjectIn(tx, projectId, actor.organizationId);
+      const existing = await tx.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      });
+      if (!existing) {
+        throw new NotFoundException('Member not found');
+      }
+      return tx.projectMember.update({
+        where: { projectId_userId: { projectId, userId } },
+        data: { role },
+        include: {
+          user: { select: { id: true, displayName: true, email: true } },
+        },
+      });
+    });
   }
 
-  async removeMember(
-    projectId: string,
-    organizationId: string,
-    userId: string,
-  ) {
-    await this.findOne(projectId, organizationId);
-
-    const existing = await this.projectsRepository.findMember(
-      projectId,
-      userId,
-    );
-    if (!existing) {
-      throw new NotFoundException('Member not found');
-    }
-
-    return this.projectsRepository.removeMember(projectId, userId);
+  async removeMember(actor: AuthUser, projectId: string, userId: string) {
+    return this.asAdmin(actor, async (tx) => {
+      await this.findProjectIn(tx, projectId, actor.organizationId);
+      const existing = await tx.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      });
+      if (!existing) {
+        throw new NotFoundException('Member not found');
+      }
+      return tx.projectMember.delete({
+        where: { projectId_userId: { projectId, userId } },
+      });
+    });
   }
 }

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 type Entry = { id: string; group: string; label: string; hint?: string; href: string };
 
@@ -34,6 +35,13 @@ const pages: Entry[] = [
   ["Einstellungen", "/settings"],
 ].map(([label, href]) => ({ id: href, group: "Gehe zu", label, href }));
 
+const ADMIN_ONLY_PAGES = new Set([
+  "/inbox",
+  "/recurring",
+  "/finance",
+  "/reports",
+]);
+
 const groupLabels: Record<keyof SearchResponse, string> = {
   customers: "Kunden",
   projects: "Projekte",
@@ -42,6 +50,7 @@ const groupLabels: Record<keyof SearchResponse, string> = {
 };
 
 export function CommandPalette() {
+  const { isAdmin } = useCurrentUser();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -97,7 +106,9 @@ export function CommandPalette() {
     const trimmed = query.trim();
     const lowered = trimmed.toLowerCase();
     const matchingPages = pages.filter(
-      (page) => !lowered || page.label.toLowerCase().includes(lowered),
+      (page) =>
+        (isAdmin || !ADMIN_ONLY_PAGES.has(page.href)) &&
+        (!lowered || page.label.toLowerCase().includes(lowered)),
     );
     const visibleFound = trimmed.length >= 2 ? found : [];
     const ask: Entry[] = trimmed
@@ -111,7 +122,7 @@ export function CommandPalette() {
         ]
       : [];
     return [...matchingPages, ...visibleFound, ...ask];
-  }, [query, found]);
+  }, [query, found, isAdmin]);
 
   function close() {
     setIsOpen(false);

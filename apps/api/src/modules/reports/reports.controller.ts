@@ -1,11 +1,15 @@
 import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import { ReportRangeDto, ReportsService } from './reports.service';
 
-@UseGuards(JwtAuthGuard)
+// Finance-sensitive: owners and admins only until the business decides otherwise.
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('OWNER', 'ADMIN')
 @Controller('reports')
 export class ReportsController {
   constructor(

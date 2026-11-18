@@ -19,7 +19,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./test/jest-e2e.json",
+    "user-admin": "nest build && node dist/src/cli/user-admin.js",
     "documents:backfill-text": "tsc -p tsconfig.scripts.json && node dist-backfill/scripts/backfill-document-text.js",
     "seed": "tsc prisma/seed.ts --outDir dist-scripts --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node dist-scripts/prisma/seed.js"
   },

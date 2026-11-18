@@ -1,3 +1,4 @@
+import { AccessService } from '../access/access.service';
 import {
   BadRequestException,
   Injectable,
@@ -102,6 +103,7 @@ export class TimeTrackingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly salesDocuments: SalesDocumentsService,
+    private readonly access: AccessService,
   ) {}
 
   list(organizationId: string, query: TimeEntryQueryDto) {
@@ -139,6 +141,7 @@ export class TimeTrackingService {
         select: { customerId: true },
       });
       if (!project) throw new BadRequestException('Project not found');
+      await this.access.assertProjectWritable(dto.projectId, userId);
       customerId = project.customerId;
     } else if (customerId) {
       const customer = await this.prisma.customer.findFirst({
@@ -259,6 +262,11 @@ export class TimeTrackingService {
       orderBy: { workDate: 'asc' },
       take: MAX_INVOICE_LINES + 1,
     });
+    // Billing marks every entry as invoiced, so the caller must be allowed to
+    // write to each affected project (VIEWER is read-only).
+    for (const projectId of new Set(entries.map((entry) => entry.projectId))) {
+      await this.access.assertProjectWritable(projectId, actorUserId);
+    }
     if (entries.length === 0) {
       throw new BadRequestException('Keine abrechenbaren Zeiten gefunden');
     }

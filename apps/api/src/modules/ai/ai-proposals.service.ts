@@ -1,3 +1,4 @@
+import { AccessService } from '../access/access.service';
 import {
   BadRequestException,
   Injectable,
@@ -62,6 +63,7 @@ export class AiProposalsService {
     private readonly purchasingService: PurchasingService,
     private readonly rentalService: RentalService,
     private readonly timeTrackingService: TimeTrackingService,
+    private readonly access: AccessService,
   ) {}
 
   /** Returns null when a proposal with the same dedupe key already exists. */
@@ -156,6 +158,14 @@ export class AiProposalsService {
     organizationId: string,
     userId: string,
   ): Promise<Record<string, unknown>> {
+    // The approving user must be allowed to write to the proposal's project.
+    const projectId =
+      payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? payload.projectId
+        : undefined;
+    if (typeof projectId === 'string') {
+      await this.access.assertProjectWritable(projectId, userId);
+    }
     switch (kind) {
       case 'CREATE_TASK': {
         const dto = await this.validated(CreateTaskDto, payload);
