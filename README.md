@@ -66,8 +66,9 @@ nachbauen wollt.
 
 ## Sicherheitskonfiguration (API)
 
-- `JWT_SECRET`: außerhalb von `NODE_ENV=development|test` Pflicht (mind. 32 Zeichen), sonst startet die API nicht.
-- `REGISTRATION_CODE`: Solange leer, ist die Registrierung deaktiviert. Der Code muss im Registrierungsformular eingegeben werden.
+- `JWT_SECRET`: außerhalb von `NODE_ENV=development|test` Pflicht (mind. 32 zufällige Zeichen, z. B. `openssl rand -base64 48`). Fehlt er oder ist er schwach/ein Platzhalter, startet die API nicht.
+- `JWT_EXPIRES_IN_MINUTES`: optionale Token-Laufzeit (1–480, Standard 480 = 8 Stunden).
+- Es gibt keine öffentliche Registrierung. Konten legt ein Administrator per CLI an: `pnpm --filter api user-admin bootstrap …` bzw. `create-user …` (Details: `docs/security/sprint-1-auth-hardening.md`).
 - `TRUST_PROXY`: Anzahl vorgeschalteter Reverse Proxies, damit das Rate-Limiting die echte Client-IP sieht.
 - Passwort-Reset-Tokens liegen nur als SHA-256-Hash in der Datenbank.
 
