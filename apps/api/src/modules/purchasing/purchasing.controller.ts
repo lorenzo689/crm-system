@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { ProjectWrite, ProjectWriteGuard } from '../access/project-write.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
@@ -23,7 +24,7 @@ import {
 } from './purchasing.dto';
 import { PurchasingService } from './purchasing.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ProjectWriteGuard)
 @Controller()
 export class PurchasingController {
   constructor(
@@ -91,12 +92,14 @@ export class PurchasingController {
     return this.service.findOrder(id, organizationId);
   }
 
+  @ProjectWrite({ bodyField: 'projectId' })
   @Post('purchase-orders')
   async createOrder(@Body() dto: CreatePurchaseOrderDto, @Req() req: Request) {
     const { organizationId, userId } = await this.scope(req);
     return this.service.createOrder(organizationId, userId, dto);
   }
 
+  @ProjectWrite({ entity: 'purchaseOrder' })
   @Post('purchase-orders/:id/status')
   async changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
@@ -107,6 +110,7 @@ export class PurchasingController {
     return this.service.changeOrderStatus(id, organizationId, dto.status);
   }
 
+  @ProjectWrite({ entity: 'purchaseOrder' })
   @Post('purchase-orders/:id/receive')
   async receive(
     @Param('id', ParseUUIDPipe) id: string,
@@ -117,6 +121,7 @@ export class PurchasingController {
     return this.service.receiveGoods(id, organizationId, dto);
   }
 
+  @ProjectWrite({ entity: 'purchaseOrder' })
   @Delete('purchase-orders/:id')
   async removeOrder(
     @Param('id', ParseUUIDPipe) id: string,

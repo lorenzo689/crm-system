@@ -27,12 +27,14 @@ export type MenuItem = {
   href: string;
   icon: ReactNode;
   gap?: boolean;
+  /** Hidden for plain members; the API enforces this independently. */
+  adminOnly?: boolean;
 };
 
 export const menuItems: MenuItem[] = [
   { title: "Übersicht", href: "/dashboard", icon: <FiGrid /> },
   { title: "KI-Assistent", href: "/assistant", icon: <FiCpu /> },
-  { title: "Posteingang", href: "/inbox", icon: <FiInbox /> },
+  { title: "Posteingang", href: "/inbox", icon: <FiInbox />, adminOnly: true },
   { title: "Kunden", href: "/customers", icon: <FiUsers />, gap: true },
   { title: "Projekte", href: "/projects", icon: <FiFolder /> },
   { title: "Aufgaben", href: "/tasks", icon: <FiList /> },
@@ -44,11 +46,11 @@ export const menuItems: MenuItem[] = [
   { title: "Angebote", href: "/quotes", icon: <FiClipboard /> },
   { title: "Rechnungen", href: "/invoices", icon: <FiCreditCard /> },
   { title: "Gutschriften", href: "/credit-notes", icon: <FiFileMinus /> },
-  { title: "Abos", href: "/recurring", icon: <FiRepeat /> },
+  { title: "Abos", href: "/recurring", icon: <FiRepeat />, adminOnly: true },
   { title: "Lieferanten", href: "/suppliers", icon: <FiTruck />, gap: true },
   { title: "Bestellungen", href: "/purchase-orders", icon: <FiShoppingCart /> },
-  { title: "Finanzen", href: "/finance", icon: <FiDollarSign /> },
-  { title: "Auswertungen", href: "/reports", icon: <FiBarChart2 /> },
+  { title: "Finanzen", href: "/finance", icon: <FiDollarSign />, adminOnly: true },
+  { title: "Auswertungen", href: "/reports", icon: <FiBarChart2 />, adminOnly: true },
   { title: "Einstellungen", href: "/settings", icon: <FiSettings />, gap: true },
 ];
 

@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { AiChatService } from './ai-chat.service';
 import { AiProposalsService } from './ai-proposals.service';
-import { AiToolsService } from './ai-tools';
+import { ADMIN_ONLY_TOOLS, AiToolsService, toolsForRole } from './ai-tools';
 
 const createMock = jest.fn();
 jest.mock('@anthropic-ai/sdk', () => ({
@@ -25,7 +25,13 @@ jest.mock('@anthropic-ai/sdk', () => ({
   })),
 }));
 
-const ctx = { organizationId: 'org1', userId: 'u1', userName: 'Test' };
+const ctx = {
+  organizationId: 'org1',
+  userId: 'u1',
+  role: 'OWNER' as const,
+  userName: 'Test',
+};
+const memberCtx = { ...ctx, role: 'MEMBER' as const };
 
 describe('AiChatService', () => {
   const originalKey = process.env.ANTHROPIC_API_KEY;
@@ -95,6 +101,38 @@ describe('AiChatService', () => {
     } as unknown as AiToolsService);
     const result = await service.chat([{ role: 'user', content: 'x' }], ctx);
     expect(result.reply).toMatch(/nicht bearbeiten/);
+  });
+});
+
+describe('AI tools by role', () => {
+  it('withholds finance, bank and inbox tools from members', () => {
+    const memberTools = toolsForRole('MEMBER').map((tool) => tool.name);
+    for (const name of ADMIN_ONLY_TOOLS) {
+      expect(memberTools).not.toContain(name);
+    }
+    expect(memberTools).toContain('propose_task');
+    expect(memberTools).toContain('list_customers');
+    expect(toolsForRole('ADMIN')).toBe(toolsForRole('OWNER'));
+    expect(toolsForRole('OWNER').map((tool) => tool.name)).toEqual(
+      expect.arrayContaining([...ADMIN_ONLY_TOOLS]),
+    );
+  });
+
+  it('refuses to execute a withheld tool even when the model asks for it', async () => {
+    const prisma = { bankTransaction: { findMany: jest.fn() } };
+    const service = new AiToolsService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    for (const name of ADMIN_ONLY_TOOLS) {
+      const outcome = await service.run(name, {}, memberCtx);
+      expect(outcome.isError).toBe(true);
+      expect(outcome.content).toContain('Ihrer Rolle');
+    }
+    expect(prisma.bankTransaction.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -179,6 +217,7 @@ describe('AiProposalsService', () => {
       {} as never,
       {} as never,
       {} as never,
+      { assertProjectWritable: jest.fn() } as never,
     );
     return { service, prisma, tasks };
   }

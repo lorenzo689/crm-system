@@ -6,10 +6,7 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
-import {
-  TaskPriority,
-  TaskStatus,
-} from '../../../../generated/prisma/client';
+import { TaskPriority, TaskStatus } from '../../../../generated/prisma/client';
 
 export class CreateTaskDto {
   @IsOptional()

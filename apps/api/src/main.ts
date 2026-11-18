@@ -6,8 +6,11 @@ import compression from 'compression';
 import { json } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { assertAuthConfig } from './modules/auth/auth-config';
 
 async function bootstrap() {
+  // Refuse to start with an unsafe auth configuration instead of failing later.
+  assertAuthConfig();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.disable('x-powered-by');

@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { Injectable } from '@nestjs/common';
+import type { OrganizationMemberRole } from '../../../generated/prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
 import { ReportsService } from '../reports/reports.service';
@@ -28,6 +29,32 @@ const itemSchema = {
   },
   required: ['description', 'quantity', 'unit', 'unitPriceCents', 'vatRateBp'],
 };
+
+/**
+ * Tools that expose finance, bank, supplier or inbox data, or prepare
+ * financial documents and orders. Plain members do not get them (they are
+ * neither offered to the model nor executable); see
+ * docs/security/sprint-1-auth-hardening.md for the business impact.
+ */
+export const ADMIN_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  'get_finance_summary',
+  'list_supplier_invoices',
+  'list_bank_transactions',
+  'get_project_profitability',
+  'list_suppliers',
+  'read_inbox',
+  'propose_send_document',
+  'propose_credit_note',
+  'propose_time_invoice',
+  'propose_purchase_order',
+  'propose_dunning',
+]);
+
+export function toolsForRole(role: OrganizationMemberRole): Anthropic.Tool[] {
+  return role === 'MEMBER'
+    ? AI_TOOLS.filter((tool) => !ADMIN_ONLY_TOOLS.has(tool.name))
+    : AI_TOOLS;
+}
 
 export const AI_TOOLS: Anthropic.Tool[] = [
   {
@@ -362,8 +389,22 @@ export class AiToolsService {
   async run(
     name: string,
     input: Record<string, unknown>,
-    ctx: { organizationId: string; userId: string },
+    ctx: {
+      organizationId: string;
+      userId: string;
+      role: OrganizationMemberRole;
+    },
   ): Promise<{ content: string; isError: boolean; proposalId?: string }> {
+    // Enforced here as well: a model (or prompt injection) must not be able to
+    // call a tool that was withheld from the list.
+    if (ctx.role === 'MEMBER' && ADMIN_ONLY_TOOLS.has(name)) {
+      return {
+        content: JSON.stringify({
+          error: 'Dieses Werkzeug steht Ihrer Rolle nicht zur Verfügung.',
+        }),
+        isError: true,
+      };
+    }
     try {
       const result = await this.dispatch(name, input, ctx);
       const proposalId =

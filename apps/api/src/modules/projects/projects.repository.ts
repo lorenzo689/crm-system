@@ -61,10 +61,7 @@ export class ProjectsRepository {
     });
   }
 
-  async findByProjectNumber(
-    projectNumber: string,
-    organizationId: string,
-  ) {
+  async findByProjectNumber(projectNumber: string, organizationId: string) {
     return this.prisma.project.findUnique({
       where: {
         organizationId_projectNumber: { organizationId, projectNumber },
@@ -105,11 +102,7 @@ export class ProjectsRepository {
     });
   }
 
-  async addMember(
-    projectId: string,
-    userId: string,
-    role: ProjectMemberRole,
-  ) {
+  async addMember(projectId: string, userId: string, role: ProjectMemberRole) {
     return this.prisma.projectMember.create({
       data: { projectId, userId, role },
       include: {

@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { STORAGE_SERVICE } from '../../common/storage/storage.interface';
 import type { StorageService } from '../../common/storage/storage.interface';
+import { AccessService } from '../access/access.service';
 import { ActivitiesService } from '../activities/activities.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -76,6 +77,7 @@ export class DocumentsService {
     @Inject(STORAGE_SERVICE) private readonly storageService: StorageService,
     private readonly activitiesService: ActivitiesService,
     private readonly textExtractionService: TextExtractionService,
+    private readonly access: AccessService,
   ) {}
 
   private async assertValidContext(
@@ -131,6 +133,7 @@ export class DocumentsService {
     dto: CreateDocumentDto,
   ) {
     await this.assertValidContext(organizationId, dto);
+    await this.access.assertProjectWritable(dto.projectId, authorId);
 
     const document = await this.documentsRepository.create({
       ...dto,
@@ -151,13 +154,20 @@ export class DocumentsService {
     return document;
   }
 
-  async update(id: string, organizationId: string, dto: UpdateDocumentDto) {
-    await this.findOne(id, organizationId);
+  async update(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+    dto: UpdateDocumentDto,
+  ) {
+    const document = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(document.projectId, actorUserId);
     return this.documentsRepository.update(id, dto);
   }
 
   async archive(id: string, organizationId: string, actorUserId: string) {
     const document = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(document.projectId, actorUserId);
     const archived = await this.documentsRepository.archive(id);
 
     const activityContext = resolveActivityContext(document);
@@ -185,6 +195,7 @@ export class DocumentsService {
     },
   ) {
     const document = await this.findOne(documentId, organizationId);
+    await this.access.assertProjectWritable(document.projectId, uploadedById);
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
       throw new BadRequestException(

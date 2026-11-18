@@ -5,6 +5,7 @@ import {
   MaxFileSizeValidator,
   Param,
   ParseFilePipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -46,7 +47,7 @@ export class DocumentsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -65,7 +66,7 @@ export class DocumentsController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDocumentDto,
     @Req() req: Request,
   ) {
@@ -73,11 +74,11 @@ export class DocumentsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.documentsService.update(id, organizationId, dto);
+    return this.documentsService.update(id, organizationId, payload.sub, dto);
   }
 
   @Post(':id/archive')
-  async archive(@Param('id') id: string, @Req() req: Request) {
+  async archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -88,7 +89,7 @@ export class DocumentsController {
   @Post(':id/versions')
   @UseInterceptors(FileInterceptor('file'))
   async uploadVersion(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 })],
@@ -111,7 +112,7 @@ export class DocumentsController {
 
   @Get(':id/download-url')
   async getDownloadUrl(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Query() query: DownloadUrlQueryDto,
     @Req() req: Request,
   ) {

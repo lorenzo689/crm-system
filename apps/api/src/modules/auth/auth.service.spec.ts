@@ -1,33 +1,42 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 import { AuthService } from './auth.service';
 
-const registerDto = {
-  email: 'new@bissinger-lights.de',
-  displayName: 'New User',
-  password: 'Passw0rd!x',
-  registrationCode: 'secret-code',
-};
+function accountState(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'u1',
+    email: 'a@b.de',
+    passwordHash: bcrypt.hashSync('Passw0rd!xyz', 4),
+    archivedAt: null,
+    tokenVersion: 3,
+    organizationRoles: [
+      {
+        organizationId: 'org1',
+        role: 'MEMBER',
+        organization: { status: 'ACTIVE', archivedAt: null },
+      },
+    ],
+    ...overrides,
+  };
+}
 
 function createService() {
-  const prisma = {
-    user: {
-      findUnique: jest.fn(),
-      create: jest
-        .fn()
-        .mockResolvedValue({ id: 'u1', email: registerDto.email }),
-      update: jest.fn(),
-    },
-    organization: { findUnique: jest.fn().mockResolvedValue({ id: 'org1' }) },
-    organizationMember: { count: jest.fn().mockResolvedValue(1) },
+  const tx = {
     passwordResetToken: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ userId: 'u1' }),
     },
-    $transaction: jest.fn().mockResolvedValue([]),
+    user: { update: jest.fn() },
+  };
+  const prisma = {
+    user: { findFirst: jest.fn() },
+    passwordResetToken: { create: jest.fn(), updateMany: jest.fn() },
+    $transaction: jest.fn((arg: unknown) =>
+      typeof arg === 'function'
+        ? (arg as (t: typeof tx) => unknown)(tx)
+        : Promise.resolve([]),
+    ),
   };
   const jwt = { sign: jest.fn().mockReturnValue('signed') };
   const mail = {
@@ -35,93 +44,71 @@ function createService() {
     sendPasswordReset: jest.fn(),
   };
   const service = new AuthService(prisma as never, jwt as never, mail as never);
-  return { service, prisma, mail };
+  return { service, prisma, tx, jwt, mail };
 }
 
 type MockCalls = { mock: { calls: unknown[][] } };
 /** First argument of the first call, typed for assertions. */
 const firstArg = <T>(fn: MockCalls) => fn.mock.calls[0][0] as T;
-type CreatedUser = {
-  data: { organizationRoles: { create: { role: string } } };
-};
+
+const credentials = { email: 'a@b.de', password: 'Passw0rd!xyz' };
 
 describe('AuthService', () => {
-  const originalCode = process.env.REGISTRATION_CODE;
-  afterEach(() => {
-    process.env.REGISTRATION_CODE = originalCode;
-  });
-
-  describe('register', () => {
-    it('is disabled while no registration code is configured', async () => {
-      delete process.env.REGISTRATION_CODE;
-      const { service, prisma } = createService();
-      await expect(service.register(registerDto)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-      expect(prisma.user.create).not.toHaveBeenCalled();
-    });
-
-    it('rejects a wrong registration code', async () => {
-      process.env.REGISTRATION_CODE = 'secret-code';
-      const { service, prisma } = createService();
-      await expect(
-        service.register({ ...registerDto, registrationCode: 'nope' }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(prisma.user.create).not.toHaveBeenCalled();
-    });
-
-    it('makes the first member of an organization its owner', async () => {
-      process.env.REGISTRATION_CODE = 'secret-code';
-      const { service, prisma } = createService();
-      prisma.user.findUnique.mockResolvedValue(null);
-      prisma.organizationMember.count.mockResolvedValue(0);
-      await service.register(registerDto);
-      const { data } = firstArg<CreatedUser>(prisma.user.create);
-      expect(data.organizationRoles.create.role).toBe('OWNER');
-    });
-
-    it('registers later members as MEMBER', async () => {
-      process.env.REGISTRATION_CODE = 'secret-code';
-      const { service, prisma } = createService();
-      prisma.user.findUnique.mockResolvedValue(null);
-      await service.register(registerDto);
-      const { data } = firstArg<CreatedUser>(prisma.user.create);
-      expect(data.organizationRoles.create.role).toBe('MEMBER');
-    });
-  });
-
   describe('login', () => {
-    it('rejects archived users even with a correct password', async () => {
-      const { service, prisma } = createService();
-      prisma.user.findUnique.mockResolvedValue({
-        id: 'u1',
-        email: 'a@b.de',
-        passwordHash: await bcrypt.hash('Passw0rd!x', 4),
-        archivedAt: new Date(),
+    it('returns a token carrying the current token version', async () => {
+      const { service, prisma, jwt } = createService();
+      prisma.user.findFirst.mockResolvedValue(accountState());
+      await expect(service.login(credentials)).resolves.toEqual({
+        accessToken: 'signed',
       });
-      await expect(
-        service.login({ email: 'a@b.de', password: 'Passw0rd!x' }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(jwt.sign).toHaveBeenCalledWith({
+        sub: 'u1',
+        email: 'a@b.de',
+        tv: 3,
+      });
     });
 
-    it('returns a token for valid credentials', async () => {
+    it.each([
+      ['an unknown account', null],
+      ['an archived user', accountState({ archivedAt: new Date() })],
+      ['a user without membership', accountState({ organizationRoles: [] })],
+      [
+        'a suspended organization',
+        accountState({
+          organizationRoles: [
+            {
+              organizationId: 'org1',
+              role: 'MEMBER',
+              organization: { status: 'SUSPENDED', archivedAt: null },
+            },
+          ],
+        }),
+      ],
+    ])('rejects %s with the generic message', async (_name, account) => {
       const { service, prisma } = createService();
-      prisma.user.findUnique.mockResolvedValue({
-        id: 'u1',
-        email: 'a@b.de',
-        passwordHash: await bcrypt.hash('Passw0rd!x', 4),
-        archivedAt: null,
-      });
+      prisma.user.findFirst.mockResolvedValue(account);
+      await expect(service.login(credentials)).rejects.toThrow(
+        new UnauthorizedException('E-Mail oder Passwort falsch'),
+      );
+    });
+
+    it('uses the same message for a wrong password', async () => {
+      const { service, prisma } = createService();
+      prisma.user.findFirst.mockResolvedValue(accountState());
       await expect(
-        service.login({ email: 'a@b.de', password: 'Passw0rd!x' }),
-      ).resolves.toEqual({ accessToken: 'signed' });
+        service.login({ ...credentials, password: 'Wrong0ne!xyz' }),
+      ).rejects.toThrow('E-Mail oder Passwort falsch');
     });
   });
 
   describe('password reset tokens', () => {
     it('stores only a hash of the token that is mailed out', async () => {
       const { service, prisma, mail } = createService();
-      prisma.user.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.de' });
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'u1',
+        email: 'a@b.de',
+        archivedAt: null,
+      });
       await service.forgotPassword({ email: 'a@b.de' });
 
       const mailed = firstArg<{ resetUrl: string }>(
@@ -135,17 +122,30 @@ describe('AuthService', () => {
       expect(stored).toBe(createHash('sha256').update(rawToken).digest('hex'));
     });
 
-    it('looks tokens up by hash when resetting', async () => {
-      const { service, prisma } = createService();
-      prisma.passwordResetToken.findUnique.mockResolvedValue(null);
+    it('does not send mail for archived users', async () => {
+      const { service, prisma, mail } = createService();
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'u1',
+        email: 'a@b.de',
+        archivedAt: new Date(),
+      });
+      await service.forgotPassword({ email: 'a@b.de' });
+      expect(mail.sendPasswordReset).not.toHaveBeenCalled();
+    });
+
+    it('consumes tokens by hash with a single conditional update', async () => {
+      const { service, tx } = createService();
       await expect(
-        service.resetPassword({ token: 'raw', password: 'Passw0rd!x' }),
+        service.resetPassword({ token: 'raw', password: 'Passw0rd!xyz' }),
       ).rejects.toThrow();
-      expect(
-        firstArg<{ where: { token: string } }>(
-          prisma.passwordResetToken.findUnique,
-        ).where.token,
-      ).toBe(createHash('sha256').update('raw').digest('hex'));
+      const call = firstArg<{ where: { token: string; usedAt: null } }>(
+        tx.passwordResetToken.updateMany,
+      );
+      expect(call.where.token).toBe(
+        createHash('sha256').update('raw').digest('hex'),
+      );
+      expect(call.where.usedAt).toBeNull();
+      expect(tx.user.update).not.toHaveBeenCalled();
     });
   });
 });

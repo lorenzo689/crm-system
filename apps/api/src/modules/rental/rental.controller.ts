@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { ProjectWrite, ProjectWriteGuard } from '../access/project-write.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
@@ -21,7 +22,7 @@ import {
   ReservationQueryDto,
 } from './rental.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ProjectWriteGuard)
 @Controller('reservations')
 export class RentalController {
   constructor(
@@ -57,12 +58,14 @@ export class RentalController {
     );
   }
 
+  @ProjectWrite({ bodyField: 'projectId' })
   @Post()
   async create(@Body() dto: CreateReservationDto, @Req() req: Request) {
     const { organizationId, userId } = await this.scope(req);
     return this.service.create(organizationId, userId, dto);
   }
 
+  @ProjectWrite({ entity: 'reservation' })
   @Post(':id/status')
   async changeStatus(
     @Param('id', ParseUUIDPipe) id: string,

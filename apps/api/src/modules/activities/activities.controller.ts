@@ -1,4 +1,11 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  ParseUUIDPipe,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
@@ -16,9 +23,11 @@ export class ActivitiesController {
   @Get()
   async findByContext(
     @Req() req: Request,
-    @Query('customerId') customerId?: string,
-    @Query('projectId') projectId?: string,
-    @Query('taskId') taskId?: string,
+    @Query('customerId', new ParseUUIDPipe({ optional: true }))
+    customerId?: string,
+    @Query('projectId', new ParseUUIDPipe({ optional: true }))
+    projectId?: string,
+    @Query('taskId', new ParseUUIDPipe({ optional: true })) taskId?: string,
   ) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(

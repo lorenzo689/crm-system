@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Req,
@@ -34,7 +35,7 @@ export class CustomersController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -53,7 +54,7 @@ export class CustomersController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCustomerDto,
     @Req() req: Request,
   ) {
@@ -61,16 +62,11 @@ export class CustomersController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.customersService.update(
-      id,
-      organizationId,
-      payload.sub,
-      dto,
-    );
+    return this.customersService.update(id, organizationId, payload.sub, dto);
   }
 
   @Post(':id/archive')
-  async archive(@Param('id') id: string, @Req() req: Request) {
+  async archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -79,7 +75,7 @@ export class CustomersController {
   }
 
   @Post(':id/unarchive')
-  async unarchive(@Param('id') id: string, @Req() req: Request) {
+  async unarchive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,

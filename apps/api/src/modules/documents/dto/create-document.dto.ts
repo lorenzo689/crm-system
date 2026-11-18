@@ -16,7 +16,9 @@ function normalizeTags(value: unknown): unknown {
 
   return [
     ...new Set(
-      value.map((tag) => (typeof tag === 'string' ? tag.trim() : tag)),
+      (value as unknown[]).map((tag) =>
+        typeof tag === 'string' ? tag.trim() : tag,
+      ),
     ),
   ];
 }

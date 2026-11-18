@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -15,7 +16,9 @@ import type {
   ProjectPriority,
   ProjectStatus,
 } from '../../../generated/prisma/client';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
@@ -24,7 +27,7 @@ import { UpdateProjectMemberDto } from './dto/update-project-member.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectsService } from './projects.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('projects')
 export class ProjectsController {
   constructor(
@@ -35,7 +38,8 @@ export class ProjectsController {
   @Get()
   async findAll(
     @Req() req: Request,
-    @Query('customerId') customerId?: string,
+    @Query('customerId', new ParseUUIDPipe({ optional: true }))
+    customerId?: string,
     @Query('status') status?: ProjectStatus,
     @Query('priority') priority?: ProjectPriority,
     @Query('archived') archived?: string,
@@ -55,7 +59,7 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -74,7 +78,7 @@ export class ProjectsController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProjectDto,
     @Req() req: Request,
   ) {
@@ -82,16 +86,14 @@ export class ProjectsController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.projectsService.update(
-      id,
-      organizationId,
-      payload.sub,
-      dto,
-    );
+    return this.projectsService.update(id, organizationId, payload.sub, dto);
   }
 
   @Get(':id/status-history')
-  async getStatusHistory(@Param('id') id: string, @Req() req: Request) {
+  async getStatusHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+  ) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -100,7 +102,7 @@ export class ProjectsController {
   }
 
   @Post(':id/archive')
-  async archive(@Param('id') id: string, @Req() req: Request) {
+  async archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -109,64 +111,55 @@ export class ProjectsController {
   }
 
   @Post(':id/unarchive')
-  async unarchive(@Param('id') id: string, @Req() req: Request) {
+  async unarchive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.projectsService.unarchive(id, organizationId);
+    return this.projectsService.unarchive(id, organizationId, payload.sub);
   }
 
+  @Roles('OWNER', 'ADMIN')
   @Post(':id/members')
   async addMember(
-    @Param('id') projectId: string,
+    @Param('id', ParseUUIDPipe) projectId: string,
     @Body() dto: AddProjectMemberDto,
     @Req() req: Request,
   ) {
-    const payload = req.user as JwtPayload;
-    const organizationId = await this.usersService.getOrganizationId(
-      payload.sub,
-    );
     return this.projectsService.addMember(
+      req.user as JwtPayload,
       projectId,
-      organizationId,
       dto.userId,
       dto.role,
     );
   }
 
+  @Roles('OWNER', 'ADMIN')
   @Patch(':id/members/:userId')
   async updateMember(
-    @Param('id') projectId: string,
-    @Param('userId') userId: string,
+    @Param('id', ParseUUIDPipe) projectId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() dto: UpdateProjectMemberDto,
     @Req() req: Request,
   ) {
-    const payload = req.user as JwtPayload;
-    const organizationId = await this.usersService.getOrganizationId(
-      payload.sub,
-    );
     return this.projectsService.updateMemberRole(
+      req.user as JwtPayload,
       projectId,
-      organizationId,
       userId,
       dto.role,
     );
   }
 
+  @Roles('OWNER', 'ADMIN')
   @Delete(':id/members/:userId')
   async removeMember(
-    @Param('id') projectId: string,
-    @Param('userId') userId: string,
+    @Param('id', ParseUUIDPipe) projectId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Req() req: Request,
   ) {
-    const payload = req.user as JwtPayload;
-    const organizationId = await this.usersService.getOrganizationId(
-      payload.sub,
-    );
     await this.projectsService.removeMember(
+      req.user as JwtPayload,
       projectId,
-      organizationId,
       userId,
     );
     return { success: true };

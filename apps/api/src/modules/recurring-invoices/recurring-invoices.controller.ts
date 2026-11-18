@@ -11,7 +11,10 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ProjectWrite, ProjectWriteGuard } from '../access/project-write.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import {
@@ -19,7 +22,9 @@ import {
   RecurringInvoicesService,
 } from './recurring-invoices.service';
 
-@UseGuards(JwtAuthGuard)
+// Finance-sensitive: owners and admins only until the business decides otherwise.
+@UseGuards(JwtAuthGuard, RolesGuard, ProjectWriteGuard)
+@Roles('OWNER', 'ADMIN')
 @Controller('recurring-invoices')
 export class RecurringInvoicesController {
   constructor(
@@ -36,6 +41,7 @@ export class RecurringInvoicesController {
     return this.service.list(await this.organizationId(req));
   }
 
+  @ProjectWrite({ bodyField: 'projectId' })
   @Post()
   async create(@Body() dto: CreateRecurringInvoiceDto, @Req() req: Request) {
     return this.service.create(await this.organizationId(req), dto);
@@ -49,16 +55,19 @@ export class RecurringInvoicesController {
     };
   }
 
+  @ProjectWrite({ entity: 'recurringInvoice' })
   @Post(':id/pause')
   async pause(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.service.setActive(id, await this.organizationId(req), false);
   }
 
+  @ProjectWrite({ entity: 'recurringInvoice' })
   @Post(':id/resume')
   async resume(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.service.setActive(id, await this.organizationId(req), true);
   }
 
+  @ProjectWrite({ entity: 'recurringInvoice' })
   @Delete(':id')
   async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.service.remove(id, await this.organizationId(req));

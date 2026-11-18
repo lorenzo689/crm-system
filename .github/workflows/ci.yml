@@ -40,8 +40,15 @@ jobs:
         run: pnpm exec prisma migrate deploy && pnpm exec prisma generate
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Security integration tests (isolated *_test database)
+        working-directory: apps/api
+        env:
+          TEST_DATABASE_URL: postgresql://bissinger:ci@localhost:5432/bissinger_os_test
+        run: |
+          PGPASSWORD=ci psql -h localhost -U bissinger -d postgres -c 'CREATE DATABASE bissinger_os_test'
+          DATABASE_URL="$TEST_DATABASE_URL" pnpm exec prisma migrate deploy
+          pnpm test:e2e
       - name: Build
         run: pnpm build
-      - name: Lint the API (new code must stay clean)
+      - name: Lint the API
         run: pnpm --filter api lint
-        continue-on-error: true

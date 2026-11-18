@@ -25,7 +25,9 @@ import {
 } from 'class-validator';
 import type { Request, Response } from 'express';
 import { AiProposalStatus } from '../../../generated/prisma/enums';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
 import { AiAgentsService } from './ai-agents.service';
@@ -57,7 +59,7 @@ class ListProposalsQuery {
   status?: AiProposalStatus;
 }
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('ai')
 export class AiController {
   constructor(
@@ -73,6 +75,8 @@ export class AiController {
     return {
       userId: payload.sub,
       organizationId: await this.usersService.getOrganizationId(payload.sub),
+      // From the database state loaded for this request, never from the client.
+      role: payload.role,
     };
   }
 
@@ -90,7 +94,7 @@ export class AiController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('chat')
   async chat(@Body() dto: ChatDto, @Req() req: Request) {
-    const { organizationId, userId } = await this.scope(req);
+    const { organizationId, userId, role } = await this.scope(req);
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { displayName: true },
@@ -98,6 +102,7 @@ export class AiController {
     const result = await this.chatService.chat(dto.messages, {
       organizationId,
       userId,
+      role,
       userName: user.displayName,
     });
     const proposals = result.proposalIds.length
@@ -116,7 +121,7 @@ export class AiController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const { organizationId, userId } = await this.scope(req);
+    const { organizationId, userId, role } = await this.scope(req);
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { displayName: true },
@@ -136,7 +141,7 @@ export class AiController {
     try {
       const result = await this.chatService.chat(
         dto.messages,
-        { organizationId, userId, userName: user.displayName },
+        { organizationId, userId, role, userName: user.displayName },
         (event) => send(event),
       );
       const proposals = result.proposalIds.length
@@ -154,24 +159,28 @@ export class AiController {
     }
   }
 
+  @Roles('OWNER', 'ADMIN')
   @Get('proposals')
   async list(@Query() query: ListProposalsQuery, @Req() req: Request) {
     const { organizationId } = await this.scope(req);
     return this.proposals.list(organizationId, query.status);
   }
 
+  @Roles('OWNER', 'ADMIN')
   @Post('proposals/:id/approve')
   async approve(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const { organizationId, userId } = await this.scope(req);
     return this.proposals.approve(id, organizationId, userId);
   }
 
+  @Roles('OWNER', 'ADMIN')
   @Post('proposals/:id/reject')
   async reject(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const { organizationId, userId } = await this.scope(req);
     return this.proposals.reject(id, organizationId, userId);
   }
 
+  @Roles('OWNER', 'ADMIN')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('agents/run')
   async runAgents(@Req() req: Request) {

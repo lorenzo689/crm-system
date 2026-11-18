@@ -6,9 +6,6 @@ export type AuthResponse = {
 
 export type ForgotPasswordResponse = {
   message: string;
-  resetToken?: string;
-  resetUrl?: string;
-  expiresAt?: string;
 };
 
 export type ResetPasswordResponse = {
@@ -17,18 +14,12 @@ export type ResetPasswordResponse = {
 
 type AuthRequestBody =
   | LoginInput
-  | RegisterInput
   | { email: string }
   | { token: string; password: string };
 
 export type LoginInput = {
   email: string;
   password: string;
-};
-
-export type RegisterInput = LoginInput & {
-  displayName: string;
-  registrationCode: string;
 };
 
 const API_URL =
@@ -87,7 +78,7 @@ export async function apiFetch<T>(
 }
 
 async function requestAuth(
-  path: "login" | "register" | "forgot-password" | "reset-password",
+  path: "login" | "forgot-password" | "reset-password",
   body: AuthRequestBody,
 ): Promise<AuthResponse | ForgotPasswordResponse | ResetPasswordResponse> {
   const response = await fetch(`${API_URL}/auth/${path}`, {
@@ -101,10 +92,6 @@ async function requestAuth(
 
 export function login(input: LoginInput) {
   return requestAuth("login", input) as Promise<AuthResponse>;
-}
-
-export function register(input: RegisterInput) {
-  return requestAuth("register", input) as Promise<AuthResponse>;
 }
 
 export function forgotPassword(input: { email: string }) {

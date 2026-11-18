@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -34,9 +35,11 @@ export class TasksController {
   @Get()
   async findAll(
     @Req() req: Request,
-    @Query('projectId') projectId?: string,
+    @Query('projectId', new ParseUUIDPipe({ optional: true }))
+    projectId?: string,
     @Query('project') project?: string,
-    @Query('assigneeId') assigneeId?: string,
+    @Query('assigneeId', new ParseUUIDPipe({ optional: true }))
+    assigneeId?: string,
     @Query('status') status?: TaskStatus,
     @Query('priority') priority?: TaskPriority,
     @Query('due') due?: 'overdue' | 'today' | 'upcoming',
@@ -60,7 +63,7 @@ export class TasksController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -79,7 +82,7 @@ export class TasksController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTaskDto,
     @Req() req: Request,
   ) {
@@ -91,7 +94,7 @@ export class TasksController {
   }
 
   @Post(':id/complete')
-  async complete(@Param('id') id: string, @Req() req: Request) {
+  async complete(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -100,7 +103,7 @@ export class TasksController {
   }
 
   @Post(':id/cancel')
-  async cancel(@Param('id') id: string, @Req() req: Request) {
+  async cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -109,7 +112,7 @@ export class TasksController {
   }
 
   @Post(':id/archive')
-  async archive(@Param('id') id: string, @Req() req: Request) {
+  async archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -118,17 +121,17 @@ export class TasksController {
   }
 
   @Post(':id/unarchive')
-  async unarchive(@Param('id') id: string, @Req() req: Request) {
+  async unarchive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.tasksService.unarchive(id, organizationId);
+    return this.tasksService.unarchive(id, organizationId, payload.sub);
   }
 
   @Post(':id/assignments')
   async assignUser(
-    @Param('id') taskId: string,
+    @Param('id', ParseUUIDPipe) taskId: string,
     @Body() dto: AssignTaskDto,
     @Req() req: Request,
   ) {
@@ -147,15 +150,20 @@ export class TasksController {
 
   @Delete(':id/assignments/:userId')
   async unassignUser(
-    @Param('id') taskId: string,
-    @Param('userId') userId: string,
+    @Param('id', ParseUUIDPipe) taskId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Req() req: Request,
   ) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    await this.tasksService.unassignUser(taskId, organizationId, userId);
+    await this.tasksService.unassignUser(
+      taskId,
+      organizationId,
+      userId,
+      payload.sub,
+    );
     return { success: true };
   }
 }

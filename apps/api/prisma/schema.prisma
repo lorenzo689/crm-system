@@ -282,6 +282,8 @@ model User {
   email                    String                 @unique
   displayName              String
   passwordHash             String?
+  /// Bumped to invalidate every JWT issued before (lock, password change/reset).
+  tokenVersion             Int                    @default(0)
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
   archivedAt               DateTime?

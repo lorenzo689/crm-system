@@ -187,13 +187,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-sm text-[#777]">
-          Noch kein Konto?{" "}
-          <Link
-            href="/register"
-            className="font-semibold text-[#171717] transition hover:text-[#d69a35]"
-          >
-            Registrieren
-          </Link>
+          Kein Zugang? Konten werden von Ihrer Administration angelegt.
         </p>
       </section>
 

@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { MailModule } from './common/mail/mail.module';
 import { StorageModule } from './common/storage/storage.module';
+import { AccessModule } from './modules/access/access.module';
 import { ActivitiesModule } from './modules/activities/activities.module';
 import { AiModule } from './modules/ai/ai.module';
 import { ArticlesModule } from './modules/articles/articles.module';
@@ -38,6 +39,7 @@ import { UsersModule } from './modules/users/users.module';
     StorageModule,
     MailModule,
     HealthModule,
+    AccessModule,
     ActivitiesModule,
     AuthModule,
     CalendarEventsModule,

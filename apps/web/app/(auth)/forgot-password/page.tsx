@@ -31,11 +31,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<{
-    message: string;
-    resetUrl?: string;
-    expiresAt?: string;
-  } | null>(null);
+  const [result, setResult] = useState<{ message: string } | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,21 +86,6 @@ export default function ForgotPasswordPage() {
               {result && (
                 <div className="space-y-3 rounded-[0.3rem] border border-[#d5e7d7] bg-[#f5fbf6] px-4 py-4 text-sm text-[#215732]">
                   <p>{result.message}</p>
-                  {result.resetUrl && (
-                    <Link
-                      href={result.resetUrl}
-                      className="inline-flex items-center gap-2 font-semibold text-[#171717] underline decoration-[#d69a35] underline-offset-4"
-                    >
-                      <FiKey />
-                      {"Reset-Formular direkt \u00f6ffnen"}
-                    </Link>
-                  )}
-                  {result.expiresAt && (
-                    <p className="text-xs text-[#51715b]">
-                      {"G\u00fcltig bis:"}{" "}
-                      {new Date(result.expiresAt).toLocaleString()}
-                    </p>
-                  )}
                 </div>
               )}
 
