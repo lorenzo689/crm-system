@@ -10,10 +10,8 @@ import {
   type CustomerOption,
   type ProjectOption,
 } from "./_components/calendar-event-form-modal";
-import {
-  getMonthGridRange,
-  MonthView,
-} from "./_components/month-view";
+import { getMonthGridRange, MonthView } from "./_components/month-view";
+import { CalendarSidebar } from "./_components/calendar-sidebar";
 import { getWeekRange, WeekView } from "./_components/week-view";
 
 type CalendarView = "agenda" | "month" | "week";
@@ -77,11 +75,7 @@ function formatDayLabel(dateString: string) {
   });
 }
 
-function formatTimeRange(
-  startsAt: string,
-  endsAt: string,
-  allDay: boolean,
-) {
+function formatTimeRange(startsAt: string, endsAt: string, allDay: boolean) {
   if (allDay) return "Ganztägig";
 
   const start = new Date(startsAt).toLocaleTimeString("de-DE", {
@@ -136,15 +130,13 @@ function eventOverlapsRange(
   range: { from: Date; to: Date },
 ) {
   return (
-    new Date(event.endsAt) >= range.from &&
-    new Date(event.startsAt) <= range.to
+    new Date(event.endsAt) >= range.from && new Date(event.startsAt) <= range.to
   );
 }
 
 function sortEvents(events: CalendarEvent[]) {
   return [...events].sort(
-    (a, b) =>
-      new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
   );
 }
 
@@ -158,9 +150,9 @@ export default function CalendarPage() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | CalendarEventStatus
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | CalendarEventStatus>(
+    "all",
+  );
   const [customerFilter, setCustomerFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -199,9 +191,7 @@ export default function CalendarPage() {
   useEffect(() => {
     apiFetch<{ calendarDefaultView: "AGENDA" | "MONTH" }>("/settings")
       .then((settings) => {
-        setView(
-          settings.calendarDefaultView === "MONTH" ? "month" : "agenda",
-        );
+        setView(settings.calendarDefaultView === "MONTH" ? "month" : "agenda");
       })
       .catch(() => setView("agenda"));
   }, []);
@@ -317,13 +307,7 @@ export default function CalendarPage() {
       });
 
     return () => controller.abort();
-  }, [
-    view,
-    visibleWeek.day,
-    visibleWeek.month,
-    visibleWeek.year,
-    weekKey,
-  ]);
+  }, [view, visibleWeek.day, visibleWeek.month, visibleWeek.year, weekKey]);
 
   const activeEvents =
     view === "month" && monthData?.key === monthKey
@@ -338,16 +322,10 @@ export default function CalendarPage() {
         if (statusFilter !== "all" && event.status !== statusFilter) {
           return false;
         }
-        if (
-          customerFilter !== "all" &&
-          event.customer?.id !== customerFilter
-        ) {
+        if (customerFilter !== "all" && event.customer?.id !== customerFilter) {
           return false;
         }
-        if (
-          projectFilter !== "all" &&
-          event.project?.id !== projectFilter
-        ) {
+        if (projectFilter !== "all" && event.project?.id !== projectFilter) {
           return false;
         }
         return true;
@@ -366,10 +344,7 @@ export default function CalendarPage() {
       setAgendaEvents((current) => sortEvents([...current, savedEvent]));
     }
 
-    const monthRange = getMonthGridRange(
-      visibleMonth.year,
-      visibleMonth.month,
-    );
+    const monthRange = getMonthGridRange(visibleMonth.year, visibleMonth.month);
     if (eventOverlapsRange(savedEvent, monthRange)) {
       setMonthData((current) =>
         current?.key === monthKey
@@ -377,7 +352,7 @@ export default function CalendarPage() {
               ...current,
               events: sortEvents([...current.events, savedEvent]),
             }
-        : current,
+          : current,
       );
     }
 
@@ -408,21 +383,19 @@ export default function CalendarPage() {
   const groups = groupByDay(filteredEvents);
   const isMonthLoading = view === "month" && monthData?.key !== monthKey;
   const monthError =
-    view === "month" && monthData?.key === monthKey
-      ? monthData.error
-      : null;
+    view === "month" && monthData?.key === monthKey ? monthData.error : null;
   const isWeekLoading = view === "week" && weekData?.key !== weekKey;
   const weekError =
     view === "week" && weekData?.key === weekKey ? weekData.error : null;
 
   return (
-    <div className="p-6 sm:p-8">
-      <div className="mb-6 flex flex-wrap items-end gap-4">
+    <div className="crm-page calendar-page">
+      <div className="crm-page-heading flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium tracking-wider text-amber-600">
-            KALENDER
+          <h1 className="text-2xl font-semibold text-zinc-900">Kalender</h1>
+          <p className="crm-subtitle">
+            Termine, Kundenbesuche und Projektmeilensteine.
           </p>
-          <h1 className="text-2xl font-semibold text-zinc-900">Termine</h1>
         </div>
         <button
           type="button"
@@ -433,11 +406,12 @@ export default function CalendarPage() {
         </button>
       </div>
 
-      <div className="mb-4 flex w-fit gap-1 rounded-lg bg-zinc-200/70 p-1">
+      <div className="crm-tabs">
         {(["agenda", "month", "week"] as const).map((calendarView) => (
           <button
             key={calendarView}
             type="button"
+            aria-pressed={view === calendarView}
             onClick={() => setView(calendarView)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               view === calendarView
@@ -454,7 +428,7 @@ export default function CalendarPage() {
         ))}
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+      <div className="crm-filter-bar mb-5 flex flex-wrap items-center gap-3">
         <select
           value={statusFilter}
           onChange={(event) =>
@@ -508,104 +482,123 @@ export default function CalendarPage() {
         </button>
       </div>
 
-      {view === "agenda" &&
-        (groups.length === 0 ? (
-          <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center">
-            <p className="text-sm text-zinc-500">
-              Keine anstehenden Termine.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {groups.map((group) => (
-              <section key={group.dateKey}>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-400">
-                  {group.label}
+      <div className="crm-calendar-layout">
+        <CalendarSidebar
+          selectedDate={
+            view === "month"
+              ? new Date(visibleMonth.year, visibleMonth.month, 1)
+              : weekRange.from
+          }
+          events={sortEvents(agendaEvents)}
+          onSelect={(day) => {
+            setView("week");
+            setVisibleWeek({
+              year: day.getFullYear(),
+              month: day.getMonth(),
+              day: day.getDate(),
+            });
+          }}
+        />
+        <div className="crm-calendar-main">
+          {view === "agenda" &&
+            (groups.length === 0 ? (
+              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center">
+                <p className="text-sm text-zinc-500">
+                  Keine anstehenden Termine.
                 </p>
-                <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                  <div className="divide-y divide-zinc-100">
-                    {group.items.map((event) => (
-                      <article key={event.id} className="px-4 py-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium text-zinc-900">
-                              {event.title}
-                            </p>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[event.status]}`}
-                            >
-                              {statusLabels[event.status]}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-xs text-zinc-500">
-                            {formatTimeRange(
-                              event.startsAt,
-                              event.endsAt,
-                              event.allDay,
-                            )}
-                            {event.location && ` · ${event.location}`}
-                          </p>
-                          {(event.customer || event.project) && (
-                            <p className="mt-1 truncate text-xs text-amber-600">
-                              {event.project?.name ?? event.customer?.name}
-                            </p>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              </section>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {groups.map((group) => (
+                  <section key={group.dateKey}>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-400">
+                      {group.label}
+                    </p>
+                    <div className="crm-table-container overflow-x-auto">
+                      <div className="divide-y divide-zinc-100">
+                        {group.items.map((event) => (
+                          <article key={event.id} className="px-4 py-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-medium text-zinc-900">
+                                  {event.title}
+                                </p>
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[event.status]}`}
+                                >
+                                  {statusLabels[event.status]}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-xs text-zinc-500">
+                                {formatTimeRange(
+                                  event.startsAt,
+                                  event.endsAt,
+                                  event.allDay,
+                                )}
+                                {event.location && ` · ${event.location}`}
+                              </p>
+                              {(event.customer || event.project) && (
+                                <p className="mt-1 truncate text-xs text-amber-600">
+                                  {event.project?.name ?? event.customer?.name}
+                                </p>
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                ))}
+              </div>
             ))}
-          </div>
-        ))}
 
-      {view === "month" &&
-        (isMonthLoading ? (
-          <p className="py-8 text-center text-sm text-zinc-400">
-            Monat wird geladen…
-          </p>
-        ) : monthError ? (
-          <p className="py-8 text-center text-sm text-red-600">
-            {monthError}
-          </p>
-        ) : (
-          <MonthView
-            events={filteredEvents}
-            year={visibleMonth.year}
-            month={visibleMonth.month}
-            onMonthChange={(year, month) =>
-              setVisibleMonth({ year, month })
-            }
-          />
-        ))}
-
-      {view === "week" &&
-        (weekError ? (
-          <p className="py-8 text-center text-sm text-red-600">
-            {weekError}
-          </p>
-        ) : (
-          <div>
-            {isWeekLoading && (
-              <p className="mb-3 text-center text-sm text-zinc-400">
-                Woche wird geladen…
+          {view === "month" &&
+            (isMonthLoading ? (
+              <p className="py-8 text-center text-sm text-zinc-400">
+                Monat wird geladen…
               </p>
-            )}
-            <WeekView
-              events={isWeekLoading ? [] : filteredEvents}
-              weekStart={weekRange.from}
-              onWeekChange={(newWeekStart) =>
-                setVisibleWeek({
-                  year: newWeekStart.getFullYear(),
-                  month: newWeekStart.getMonth(),
-                  day: newWeekStart.getDate(),
-                })
-              }
-            />
-          </div>
-        ))}
+            ) : monthError ? (
+              <p className="py-8 text-center text-sm text-red-600">
+                {monthError}
+              </p>
+            ) : (
+              <MonthView
+                events={filteredEvents}
+                year={visibleMonth.year}
+                month={visibleMonth.month}
+                onMonthChange={(year, month) =>
+                  setVisibleMonth({ year, month })
+                }
+              />
+            ))}
 
+          {view === "week" &&
+            (weekError ? (
+              <p className="py-8 text-center text-sm text-red-600">
+                {weekError}
+              </p>
+            ) : (
+              <div>
+                {isWeekLoading && (
+                  <p className="mb-3 text-center text-sm text-zinc-400">
+                    Woche wird geladen…
+                  </p>
+                )}
+                <WeekView
+                  events={isWeekLoading ? [] : filteredEvents}
+                  weekStart={weekRange.from}
+                  onWeekChange={(newWeekStart) =>
+                    setVisibleWeek({
+                      year: newWeekStart.getFullYear(),
+                      month: newWeekStart.getMonth(),
+                      day: newWeekStart.getDate(),
+                    })
+                  }
+                />
+              </div>
+            ))}
+        </div>
+      </div>
       {isModalOpen && (
         <CalendarEventFormModal
           customers={customers}

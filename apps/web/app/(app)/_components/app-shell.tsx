@@ -10,10 +10,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
-    <main className="flex h-full w-full overflow-hidden bg-zinc-100">
+    <main
+      className={`flex h-full w-full overflow-hidden bg-zinc-100 crm-shell`}
+    >
       <AppSidebar
         isOpen={isSidebarOpen}
-        onToggleSidebar={() => setIsSidebarOpen((previousOpen) => !previousOpen)}
+        onToggleSidebar={() =>
+          setIsSidebarOpen((previousOpen) => !previousOpen)
+        }
       />
 
       <section className="flex h-full w-0 min-w-0 flex-1 flex-col overflow-hidden bg-zinc-100">

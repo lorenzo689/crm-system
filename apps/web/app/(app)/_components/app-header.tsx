@@ -40,7 +40,7 @@ export function AppHeader() {
   return (
     <header className="relative z-30 flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur md:px-8 md:py-5">
       <div className="flex min-w-0 items-center gap-3 xl:gap-6">
-        <div className="min-w-0">
+        <div className="app-header-title min-w-0">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-zinc-400">
             Bissinger OS
           </p>
@@ -57,7 +57,7 @@ export function AppHeader() {
 
         <button
           type="button"
-          className="hidden h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50 xl:inline-flex"
+          className="app-header-date hidden h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50 xl:inline-flex"
         >
           Heute, {today}
         </button>

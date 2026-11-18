@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -28,15 +27,14 @@ type AppSidebarProps = {
   onToggleSidebar: () => void;
 };
 
-export function AppSidebar({
-  isOpen,
-  onToggleSidebar,
-}: AppSidebarProps) {
+export function AppSidebar({ isOpen, onToggleSidebar }: AppSidebarProps) {
   const pathname = usePathname();
   const [user, setUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
-    apiFetch<CurrentUser>("/users/me").then(setUser).catch(() => undefined);
+    apiFetch<CurrentUser>("/users/me")
+      .then(setUser)
+      .catch(() => undefined);
   }, []);
 
   return (
@@ -64,20 +62,25 @@ export function AppSidebar({
 
       <div
         className={cn(
-          "flex min-h-[72px] items-center gap-x-4",
+          "app-sidebar-brand flex min-h-[72px] items-center gap-x-4",
           isOpen ? "pr-12" : "justify-center pt-12",
         )}
       >
-        <Image
-          src="https://cdn.pixabay.com/photo/2017/02/18/19/20/logo-2078018_640.png"
-          alt="Logo"
-          width={40}
-          height={40}
-          className={cn(
-            "h-10 w-10 cursor-pointer rounded-full object-cover transition-transform duration-300 ease-in-out",
-            isOpen && "rotate-[360deg]",
-          )}
-        />
+        <svg
+          viewBox="0 0 48 48"
+          width="42"
+          height="42"
+          aria-label="Bissinger Lights"
+          className="shrink-0 text-[#c48b36]"
+        >
+          <path
+            d="M8 7h21c20 0 20 22 0 22H16v12H8V22h21c9 0 9-8 0-8H8V7Zm8 28h13c9 0 15-4 18-10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3.5"
+          />
+          <path d="M4 20h15M4 29h8" stroke="currentColor" strokeWidth="3" />
+        </svg>
 
         <h1
           className={cn(
@@ -86,6 +89,11 @@ export function AppSidebar({
           )}
         >
           Bissinger OS
+          {
+            <span className="block text-sm font-normal text-zinc-300">
+              Bissinger Lights
+            </span>
+          }
         </h1>
       </div>
 
@@ -110,11 +118,18 @@ export function AppSidebar({
         </ul>
       </nav>
 
-      <div
-        className={cn(
-          "mt-auto shrink-0 pt-6",
-        )}
-      >
+      {isOpen && (
+        <div className="documents-sidebar-footer">
+          <strong>Bissinger Lights</strong>
+          <p>
+            The discreet light behind
+            <br />
+            every great performance.
+          </p>
+          <span />
+        </div>
+      )}
+      <div className={cn("app-sidebar-profile mt-auto shrink-0 pt-6")}>
         <Link
           href="/profile"
           aria-label="Profil öffnen"
@@ -161,6 +176,7 @@ function SidebarMenuItem({
 }: SidebarMenuItemProps) {
   return (
     <li
+      data-active={isActive}
       className={cn(
         "group rounded-xl px-4 py-3 text-zinc-50 transition-colors duration-300 ease-in-out hover:cursor-pointer hover:bg-white hover:text-[#1d1d1f]",
         item.gap ? "mt-9" : "mt-2",

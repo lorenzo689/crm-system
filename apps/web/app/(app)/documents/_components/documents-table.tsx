@@ -1,5 +1,6 @@
 "use client";
 
+import { FiDownload, FiFile, FiImage } from "react-icons/fi";
 import { useState } from "react";
 import {
   documentTypeLabels,
@@ -7,9 +8,10 @@ import {
   openDocumentDownload,
   type DocumentListItem,
 } from "@/lib/documents";
-import { DocumentAssignment } from "./document-assignment";
 
 type DocumentsTableProps = {
+  selectedId?: string;
+  view?: "list" | "grid";
   documents: DocumentListItem[] | null;
   error: string | null;
   isRefreshing: boolean;
@@ -20,14 +22,33 @@ type DocumentsTableProps = {
 };
 
 const columns = [
-  { label: "Titel", className: "w-[28%]" },
-  { label: "Typ", className: "w-[11%]" },
-  { label: "Zuordnung", className: "w-[19%]" },
-  { label: "Version", className: "w-[8%]" },
-  { label: "Größe", className: "w-[9%]" },
-  { label: "Hochgeladen", className: "w-[17%]" },
-  { label: "Aktion", className: "w-[8%]" },
+  { label: "Name ↑", className: "w-[43%]" },
+  { label: "Typ", className: "w-[9%]" },
+  { label: "Größe", className: "w-[10%]" },
+  { label: "Version", className: "w-[10%]" },
+  { label: "Geändert am", className: "w-[14%]" },
+  { label: "Von", className: "w-[8%]" },
+  { label: "", className: "w-[6%]" },
 ];
+
+export function FileIcon({ document }: { document: DocumentListItem }) {
+  const extension =
+    document.currentVersion?.fileName.split(".").pop()?.toUpperCase() ??
+    "DATEI";
+  const kind = document.currentVersion?.mimeType.startsWith("image/")
+    ? "image"
+    : extension === "PDF"
+      ? "pdf"
+      : ["XLS", "XLSX"].includes(extension)
+        ? "sheet"
+        : "other";
+  return (
+    <span className={`documents-file-icon ${kind}`}>
+      {kind === "image" ? <FiImage /> : <FiFile />}
+      <small>{extension.slice(0, 4)}</small>
+    </span>
+  );
+}
 
 export function TypeBadge({ type }: { type: DocumentListItem["type"] }) {
   return (
@@ -76,10 +97,11 @@ function Message({
 
 export function DocumentsTable({
   documents,
+  selectedId,
+  view = "list",
   error,
   isRefreshing,
   hasActiveFilter,
-  customerNameByProject,
   onRetry,
   onSelect,
 }: DocumentsTableProps) {
@@ -143,98 +165,128 @@ export function DocumentsTable({
       <tr
         key={document.id}
         tabIndex={0}
+        aria-selected={selectedId === document.id}
         onClick={() => onSelect(document)}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && event.target === event.currentTarget) {
+          if (
+            (event.key === "Enter" || event.key === " ") &&
+            event.target === event.currentTarget
+          ) {
+            event.preventDefault();
             onSelect(document);
           }
         }}
-        className="cursor-pointer border-b border-zinc-100 outline-none transition-colors last:border-0 hover:bg-zinc-50 focus-visible:bg-zinc-50"
+        className="documents-file-row"
       >
-        <td className="px-4 py-3 align-top">
-          <p className="truncate font-medium text-zinc-900">{document.title}</p>
-          {document.tags.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {document.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-500"
-                >
-                  {tag}
-                </span>
-              ))}
+        <td>
+          <div className="documents-file-name">
+            <FileIcon document={document} />
+            <div>
+              <p title={document.title}>{document.title}</p>
+              <span>
+                {document.tags.length
+                  ? document.tags.join(" \u00b7 ")
+                  : (document.project?.name ??
+                    document.customer?.name ??
+                    documentTypeLabels[document.type])}
+              </span>
             </div>
-          )}
+          </div>
         </td>
-        <td className="px-4 py-3 align-top">
-          <TypeBadge type={document.type} />
+        <td>
+          {document.currentVersion?.fileName.split(".").pop()?.toUpperCase() ??
+            "–"}
         </td>
-        <td className="px-4 py-3 align-top text-zinc-600">
-          <DocumentAssignment
-            document={document}
-            customerNameByProject={customerNameByProject}
-          />
-        </td>
-        <td className="px-4 py-3 align-top text-zinc-600">
-          {document.currentVersion
-            ? `v${document.currentVersion.versionNumber}`
-            : "–"}
-        </td>
-        <td className="px-4 py-3 align-top text-zinc-600">
+        <td>
           {document.currentVersion
             ? formatFileSize(document.currentVersion.sizeBytes)
             : "–"}
         </td>
-        <td className="px-4 py-3 align-top text-zinc-600">
-          {document.currentVersion ? (
-            <>
-              <p className="truncate">
-                {document.currentVersion.uploadedBy.displayName}
-              </p>
-              <p className="text-xs text-zinc-400">
-                {new Date(document.currentVersion.createdAt).toLocaleDateString(
-                  "de-DE",
-                )}
-              </p>
-            </>
-          ) : (
-            "–"
-          )}
+        <td>
+          <span className="documents-version-badge">
+            {document.currentVersion
+              ? `v${document.currentVersion.versionNumber}.0`
+              : "–"}
+          </span>
         </td>
-        <td className="px-4 py-3 align-top">
-          {document.currentVersion && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                void handleDownload(document);
-              }}
-              disabled={downloadingId === document.id}
-              className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline disabled:opacity-50"
-            >
-              {downloadingId === document.id ? "Lädt …" : "Download"}
-            </button>
-          )}
+        <td>{new Date(document.updatedAt).toLocaleDateString("de-DE")}</td>
+        <td>
+          <span
+            className="documents-avatar"
+            title={
+              document.currentVersion?.uploadedBy.displayName ??
+              document.author.displayName
+            }
+          >
+            {(
+              document.currentVersion?.uploadedBy.displayName ??
+              document.author.displayName
+            )
+              .split(/\s+/)
+              .map((part) => part[0])
+              .slice(0, 2)
+              .join("")
+              .toUpperCase()}
+          </span>
+        </td>
+        <td>
+          <button
+            type="button"
+            aria-label={`${document.title} herunterladen`}
+            disabled={!document.currentVersion || downloadingId === document.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleDownload(document);
+            }}
+            className="documents-row-action"
+          >
+            <FiDownload />
+          </button>
         </td>
       </tr>
     ));
   }
 
+  if (view === "grid" && documents?.length && !error)
+    return (
+      <div className="documents-file-grid" aria-busy={isRefreshing}>
+        {documents.map((document) => (
+          <button
+            key={document.id}
+            className={`documents-file-card ${selectedId === document.id ? "active" : ""}`}
+            onClick={() => onSelect(document)}
+          >
+            <FileIcon document={document} />
+            <strong>{document.title}</strong>
+            <span>
+              {documentTypeLabels[document.type]} ·{" "}
+              {document.currentVersion
+                ? formatFileSize(document.currentVersion.sizeBytes)
+                : "Keine Datei"}
+            </span>
+            <span>
+              {document.project?.name ?? document.customer?.name ?? "Global"}
+            </span>
+          </button>
+        ))}
+      </div>
+    );
+
   return (
     <div>
       <div
-        className={`overflow-hidden rounded-xl border border-zinc-200 bg-white transition-opacity ${
+        className={`documents-table-wrap transition-opacity ${
           isRefreshing ? "opacity-60" : "opacity-100"
         }`}
       >
         {showTable ? (
-          <table className="w-full table-fixed text-sm">
+          <table className="documents-table w-full table-fixed">
             <thead>
-              <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wider text-zinc-400">
+              <tr className="text-left">
                 {columns.map((column) => (
                   <th
                     key={column.label}
-                    className={`px-4 py-3 font-medium ${column.className}`}
+                    className={`font-medium ${column.className}`}
                   >
                     {column.label}
                   </th>
