@@ -2,8 +2,8 @@ jest.mock('../src/common/prisma/prisma.service', () => ({
   PrismaService: class PrismaServiceMock {
     async onModuleInit() {}
     async onModuleDestroy() {}
-    async $queryRaw() {
-      return [{ '?column?': 1 }];
+    $queryRaw() {
+      return Promise.resolve([{ '?column?': 1 }]);
     }
   },
 }));
@@ -41,9 +41,14 @@ describe('HealthController (e2e)', () => {
       .get('/api/v1/health')
       .expect(200)
       .expect((response) => {
-        expect(response.body.status).toBe('ok');
-        expect(response.body.database).toBe('connected');
-        expect(typeof response.body.timestamp).toBe('string');
+        const body = response.body as {
+          status: string;
+          database: string;
+          timestamp: unknown;
+        };
+        expect(body.status).toBe('ok');
+        expect(body.database).toBe('connected');
+        expect(typeof body.timestamp).toBe('string');
       });
   });
 

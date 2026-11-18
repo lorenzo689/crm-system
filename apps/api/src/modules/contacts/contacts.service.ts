@@ -26,7 +26,10 @@ export class ContactsService {
 
   async findAllByCustomer(customerId: string, organizationId: string) {
     await this.assertCustomerExists(customerId, organizationId);
-    return this.contactsRepository.findAllByCustomer(customerId, organizationId);
+    return this.contactsRepository.findAllByCustomer(
+      customerId,
+      organizationId,
+    );
   }
 
   async findOne(id: string, organizationId: string) {

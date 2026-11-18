@@ -53,7 +53,8 @@ describe('parseBankCsv', () => {
   });
 
   it('handles comma separated ISO exports with a BOM', () => {
-    const csv = '\uFEFFdate,amount,name,purpose\n2026-10-17,"1234.56",ACME,Zahlung';
+    const csv =
+      '\uFEFFdate,amount,name,purpose\n2026-10-17,"1234.56",ACME,Zahlung';
     const { transactions } = parseBankCsv(csv);
     expect(transactions).toHaveLength(1);
     expect(transactions[0].amountCents).toBe(123456);
