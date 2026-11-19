@@ -1,8 +1,10 @@
 "use client";
 
-import { logout } from "@/lib/session";
+import { useLogout } from "@/lib/use-logout";
 
 export function SessionSection() {
+  const { logout, isPending, error } = useLogout();
+
   return (
     <div className="space-y-8">
       <div>
@@ -16,15 +18,22 @@ export function SessionSection() {
         <div>
           <p className="text-sm font-medium text-zinc-900">Aktuelle Sitzung</p>
           <p className="mt-1 text-xs text-zinc-500">
-            Beim Abmelden wird das Zugriffstoken auf diesem Gerät entfernt.
+            Beim Abmelden wird diese Sitzung auf dem Server beendet. Andere
+            Geräte bleiben angemeldet.
           </p>
+          {error && (
+            <p role="alert" className="mt-2 text-xs text-red-600">
+              {error}
+            </p>
+          )}
         </div>
         <button
           type="button"
-          onClick={() => logout()}
-          className="mt-4 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 sm:mt-0"
+          onClick={() => void logout()}
+          disabled={isPending}
+          className="mt-4 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-50 sm:mt-0"
         >
-          Abmelden
+          {isPending ? "Wird abgemeldet…" : "Abmelden"}
         </button>
       </div>
     </div>

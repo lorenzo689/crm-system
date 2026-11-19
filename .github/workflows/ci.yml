@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# The workflow only reads the repository.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -40,7 +44,7 @@ jobs:
         run: pnpm exec prisma migrate deploy && pnpm exec prisma generate
       - run: pnpm typecheck
       - run: pnpm test
-      - name: Security integration tests (isolated *_test database)
+      - name: Security integration tests (isolated *_test database, cookie sessions, CSRF)
         working-directory: apps/api
         env:
           TEST_DATABASE_URL: postgresql://bissinger:ci@localhost:5432/bissinger_os_test
@@ -50,5 +54,5 @@ jobs:
           pnpm test:e2e
       - name: Build
         run: pnpm build
-      - name: Lint the API
-        run: pnpm --filter api lint
+      - name: Lint (API and web, mandatory)
+        run: pnpm lint

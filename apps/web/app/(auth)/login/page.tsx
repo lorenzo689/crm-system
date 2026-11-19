@@ -3,10 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
 import { apiFetch, login as loginRequest } from "@/lib/auth-api";
-import { consumeSessionNotice, storeAccessToken } from "@/lib/session";
+import { getSessionNotice } from "@/lib/session";
+
+const noSubscription = () => () => {};
 
 function BrandMark() {
   return (
@@ -35,12 +37,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    setSessionNotice(consumeSessionNotice());
-  }, []);
+  // Read once per page load; null during server rendering.
+  const sessionNotice = useSyncExternalStore(
+    noSubscription,
+    getSessionNotice,
+    () => null,
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,8 +51,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { accessToken } = await loginRequest({ email, password });
-      storeAccessToken(accessToken);
+      // The API sets the HttpOnly session cookie; the body has no credential.
+      await loginRequest({ email, password });
 
       const landingRoutes: Record<string, string> = {
         DASHBOARD: "/dashboard",

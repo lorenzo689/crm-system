@@ -10,9 +10,13 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ACCOUNT_STATE_SELECT, getUsableMembership } from './account-status';
 import { AuthMailService } from './auth-mail.service';
+import { JWT_ALGORITHMS } from './auth-config';
+import { CsrfTokenException, csrfTokenFor, isValidCsrfToken } from './csrf';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SessionService, type SessionClaims } from './session.service';
+import type { AuthUser } from './strategies/jwt.strategies';
 
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
@@ -43,9 +47,15 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly authMailService: AuthMailService,
+    private readonly sessions: SessionService,
   ) {}
 
-  async login(dto: LoginDto) {
+  /**
+   * Verifies credentials and opens a brand-new server-side session. A session
+   * cookie the browser already presented is revoked rather than reused, so a
+   * planted (fixated) session can never become the authenticated one.
+   */
+  async login(dto: LoginDto, presentedCookie: string | null) {
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: dto.email.trim(), mode: 'insensitive' } },
       select: ACCOUNT_STATE_SELECT,
@@ -61,7 +71,105 @@ export class AuthService {
       throw new UnauthorizedException('E-Mail oder Passwort falsch');
     }
 
-    return this.buildAuthResponse(user.id, user.email, user.tokenVersion);
+    const previous = this.verifySessionCookie(presentedCookie);
+    if (previous) {
+      await this.sessions.revoke(previous.sid);
+    }
+
+    const issued = await this.sessions.create(user);
+    const membership = getUsableMembership(user);
+    return {
+      issued,
+      body: await this.describeSession(
+        user.id,
+        issued.sessionId,
+        issued.expiresAt,
+        membership?.role,
+      ),
+    };
+  }
+
+  /** What the browser may know about its session. Never the session secret. */
+  async getSession(authUser: AuthUser) {
+    return this.describeSession(
+      authUser.sub,
+      authUser.sessionId,
+      authUser.sessionExpiresAt,
+      authUser.role,
+    );
+  }
+
+  /**
+   * Ends the session of this browser only. Without a usable session there is
+   * nothing to revoke and the caller just gets its cookie cleared; with one,
+   * the CSRF token is mandatory so a foreign site cannot log users out.
+   */
+  async logout(
+    presentedCookie: string | null,
+    csrfHeader: string | string[] | undefined,
+  ) {
+    const claims = this.verifySessionCookie(presentedCookie);
+    const session = claims ? await this.sessions.findActive(claims) : null;
+    if (!session) {
+      return { revoked: false };
+    }
+    if (!isValidCsrfToken(session.id, csrfHeader)) {
+      throw new CsrfTokenException();
+    }
+    await this.sessions.revoke(session.id);
+    return { revoked: true };
+  }
+
+  private verifySessionCookie(cookie: string | null): SessionClaims | null {
+    if (!cookie) {
+      return null;
+    }
+    try {
+      const claims = this.jwtService.verify<Partial<SessionClaims>>(cookie, {
+        algorithms: [...JWT_ALGORITHMS],
+      });
+      return typeof claims.sid === 'string' &&
+        typeof claims.sub === 'string' &&
+        typeof claims.jti === 'string' &&
+        typeof claims.tv === 'number'
+        ? (claims as SessionClaims)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async describeSession(
+    userId: string,
+    sessionId: string,
+    expiresAt: Date,
+    role: string | undefined,
+  ) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        organizationRoles: {
+          orderBy: { joinedAt: 'asc' },
+          take: 1,
+          select: { organization: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    const organization = user.organizationRoles[0]?.organization ?? null;
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+      },
+      organization,
+      role: role ?? null,
+      csrfToken: csrfTokenFor(sessionId),
+      expiresAt: expiresAt.toISOString(),
+    };
   }
 
   /**
@@ -178,9 +286,11 @@ export class AuthService {
       });
       await tx.user.update({
         where: { id: token.userId },
-        // Bumping tokenVersion invalidates every JWT issued before the reset.
+        // Every session ends: the rows are revoked and the bumped tokenVersion
+        // rejects any cookie issued before the reset as a second barrier.
         data: { passwordHash, tokenVersion: { increment: 1 } },
       });
+      await this.sessions.revokeAllForUser(token.userId, tx);
       await tx.passwordResetToken.updateMany({
         where: { userId: token.userId, usedAt: null },
         data: { usedAt: now },
@@ -197,19 +307,6 @@ export class AuthService {
     return {
       message: 'Passwort wurde erfolgreich zurückgesetzt',
     };
-  }
-
-  private buildAuthResponse(
-    userId: string,
-    email: string,
-    tokenVersion: number,
-  ) {
-    const accessToken = this.jwtService.sign({
-      sub: userId,
-      email,
-      tv: tokenVersion,
-    });
-    return { accessToken };
   }
 
   private buildPasswordResetUrl(token: string) {

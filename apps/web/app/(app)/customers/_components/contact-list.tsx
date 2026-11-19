@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useApiResource } from "@/lib/use-api-resource";
 import { ContactFormModal } from "./contact-form-modal";
 import type { Contact } from "./customer-types";
 
@@ -11,33 +12,21 @@ type ContactListProps = {
 };
 
 export function ContactList({ customerId, isOpen }: ContactListProps) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    data,
+    error,
+    isLoading,
+    setData: setContacts,
+    setError,
+  } = useApiResource<Contact[]>(
+    isOpen ? `/contacts?customerId=${customerId}` : null,
+    "Ansprechpartner konnten nicht geladen werden.",
+  );
+  const contacts = data ?? [];
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    apiFetch<Contact[]>(`/contacts?customerId=${customerId}`)
-      .then((loadedContacts) => setContacts(loadedContacts))
-      .catch((caughtError) => {
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Ansprechpartner konnten nicht geladen werden.",
-        );
-      })
-      .finally(() => setIsLoading(false));
-  }, [customerId, isOpen]);
 
   function upsertContact(updated: Contact) {
     setContacts((current) => {

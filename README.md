@@ -67,7 +67,9 @@ nachbauen wollt.
 ## Sicherheitskonfiguration (API)
 
 - `JWT_SECRET`: außerhalb von `NODE_ENV=development|test` Pflicht (mind. 32 zufällige Zeichen, z. B. `openssl rand -base64 48`). Fehlt er oder ist er schwach/ein Platzhalter, startet die API nicht.
-- `JWT_EXPIRES_IN_MINUTES`: optionale Token-Laufzeit (1–480, Standard 480 = 8 Stunden).
+- `JWT_EXPIRES_IN_MINUTES`: optionale Sitzungsdauer (1–480, Standard 480 = 8 Stunden).
+- `WEB_ORIGIN`: exakte Herkunft der Weboberfläche (z. B. `https://erp.example.com`, mehrere kommagetrennt). Außerhalb von development/test Pflicht und nur als `https://`-Origin ohne Pfad; sonst startet die API nicht. Daraus leiten sich CORS und die Origin-Prüfung ab.
+- Anmeldung über ein HttpOnly-Session-Cookie (`__Host-bissinger_session`, lokal `bissinger_session`) mit serverseitiger Sitzung und CSRF-Token; im Browser-Speicher liegt kein Token. Lokal immer `http://localhost:3000` und `http://localhost:4000` verwenden, nicht `127.0.0.1` mischen (Details: `docs/security/sprint-2-session-security.md`).
 - Es gibt keine öffentliche Registrierung. Konten legt ein Administrator per CLI an: `pnpm --filter api user-admin bootstrap …` bzw. `create-user …` (Details: `docs/security/sprint-1-auth-hardening.md`).
 - `TRUST_PROXY`: Anzahl vorgeschalteter Reverse Proxies, damit das Rate-Limiting die echte Client-IP sieht.
 - Passwort-Reset-Tokens liegen nur als SHA-256-Hash in der Datenbank.

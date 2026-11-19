@@ -63,8 +63,85 @@ describe('auth configuration', () => {
             JWT_SECRET: STRONG,
             SMTP_HOST: 'smtp.example.com',
             MAIL_FROM: 'noreply@example.com',
+            WEB_ORIGIN: 'https://erp.example.com',
           }),
         ),
+      ).not.toThrow();
+    });
+
+    it('refuses to start without an exact HTTPS web origin (cookies, CSRF)', () => {
+      const base = {
+        NODE_ENV: 'production',
+        JWT_SECRET: STRONG,
+        SMTP_HOST: 'smtp.example.com',
+        MAIL_FROM: 'noreply@example.com',
+      };
+      expect(() => assertAuthConfig(env(base))).toThrow(
+        /WEB_ORIGIN must be set/,
+      );
+      for (const origin of [
+        'http://erp.example.com',
+        'https://erp.example.com/',
+        'https://erp.example.com/app',
+        '*',
+        'not a url',
+      ]) {
+        expect(() =>
+          assertAuthConfig(env({ ...base, WEB_ORIGIN: origin })),
+        ).toThrow(/WEB_ORIGIN/);
+      }
+      expect(() =>
+        assertAuthConfig(
+          env({
+            ...base,
+            WEB_ORIGIN: 'https://erp.example.com, https://erp2.example.com',
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it.each([
+      [
+        'plain HTTP on an external host',
+        'development',
+        'http://erp.example.com',
+        /only allowed for localhost/,
+      ],
+      [
+        'mixed http and https',
+        'development',
+        'http://localhost:3000,https://erp.example.com',
+        /must not mix/,
+      ],
+      ['a path', 'test', 'http://localhost:3000/app', /bare origins/],
+      [
+        'HTTP localhost in production',
+        'production',
+        'http://localhost:3000',
+        /bare https origins/,
+      ],
+    ])('rejects %s in WEB_ORIGIN', (_label, nodeEnv, origin, message) => {
+      expect(() =>
+        assertAuthConfig(
+          env({
+            NODE_ENV: nodeEnv,
+            JWT_SECRET: STRONG,
+            SMTP_HOST: 'smtp.example.com',
+            MAIL_FROM: 'noreply@example.com',
+            WEB_ORIGIN: origin,
+          }),
+        ),
+      ).toThrow(message);
+    });
+
+    it.each([
+      ['development', 'http://localhost:3000'],
+      ['development', 'http://127.0.0.1:3000'],
+      ['development', 'https://erp.example.com'],
+      ['test', 'http://localhost:3000,http://127.0.0.1:3000'],
+    ])('accepts NODE_ENV=%s with WEB_ORIGIN=%s', (nodeEnv, origin) => {
+      expect(() =>
+        assertAuthConfig(env({ NODE_ENV: nodeEnv, WEB_ORIGIN: origin })),
       ).not.toThrow();
     });
 

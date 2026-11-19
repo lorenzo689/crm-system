@@ -13,7 +13,7 @@ import {
   ProvisioningError,
 } from '../src/modules/users/user-provisioning';
 import {
-  bearer,
+  asUser,
   createOrganization,
   createProject,
   createTestApp,
@@ -63,6 +63,9 @@ const PUBLIC_ROUTES = new Set([
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/forgot-password',
   'POST /api/v1/auth/reset-password',
+  // Without a live session logout only clears the cookie (204, no state
+  // change); with one it requires that session's CSRF token (auth spec).
+  'POST /api/v1/auth/logout',
   'GET /api/v1/health',
 ]);
 
@@ -139,7 +142,7 @@ describe('Security review regressions', () => {
           t,
           route.method,
         )(path)
-          .set(bearer(s.ownerToken))
+          .set(asUser(s.ownerToken))
           .send({});
         if (response.status < 400 || response.status >= 500) {
           bad.push(`${key} -> ${response.status}`);
@@ -164,7 +167,7 @@ describe('Security review regressions', () => {
         const response = await t
           .http()
           [method](api(path))
-          .set(bearer(s.memberToken));
+          .set(asUser(s.memberToken));
         statuses.push(`${method} ${path} -> ${response.status}`);
       }
       expect(statuses.every((line) => /-> 4\d\d$/.test(line))).toBe(true);
@@ -180,7 +183,7 @@ describe('Security review regressions', () => {
           t,
           route.method,
         )(path)
-          .set(bearer(s.ownerToken))
+          .set(asUser(s.ownerToken))
           .send({});
         if (response.status !== 400) {
           bad.push(
@@ -205,7 +208,7 @@ describe('Security review regressions', () => {
       const statuses = await Promise.all(
         probes.map(
           async (path) =>
-            `${path} -> ${(await t.http().get(api(path)).set(bearer(s.memberToken))).status}`,
+            `${path} -> ${(await t.http().get(api(path)).set(asUser(s.memberToken))).status}`,
         ),
       );
       expect(statuses.filter((line) => !line.endsWith('-> 400'))).toEqual([]);
@@ -216,7 +219,7 @@ describe('Security review regressions', () => {
       const response = await t
         .http()
         .get(api('/projects/not-a-uuid'))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(JSON.stringify(response.body)).not.toMatch(
         /prisma|P20\d\d|uuid syntax/i,
       );
@@ -227,7 +230,7 @@ describe('Security review regressions', () => {
       const response = await t
         .http()
         .get(api(`/projects/${randomUUID()}`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(response.status).toBe(404);
     });
   });
@@ -275,7 +278,7 @@ describe('Security review regressions', () => {
         const response = await t
           .http()
           .get(route.path)
-          .set(bearer(mine.ownerToken));
+          .set(asUser(mine.ownerToken));
         const body =
           JSON.stringify(response.body ?? '') + (response.text ?? '');
         for (const marker of markers) {
@@ -321,7 +324,7 @@ describe('Security review regressions', () => {
       const response = await t
         .http()
         .post(api(path))
-        .set(bearer(token))
+        .set(asUser(token))
         .send(body);
       expect(response.status).toBe(201);
       return (response.body as { id: string }).id;
@@ -332,7 +335,7 @@ describe('Security review regressions', () => {
       const response = await t
         .http()
         .post(api('/calendar-events'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({
           title: 'Eingeschleust',
           startsAt: '2027-01-01T10:00:00.000Z',
@@ -357,17 +360,17 @@ describe('Security review regressions', () => {
       const patch = await t
         .http()
         .patch(api(`/calendar-events/${event.id}`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ title: 'Manipuliert' });
       const cancel = await t
         .http()
         .post(api(`/calendar-events/${event.id}/cancel`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect([patch.status, cancel.status]).toEqual([403, 403]);
       const archive = await t
         .http()
         .post(api(`/calendar-events/${event.id}/archive`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(archive.status).toBe(403);
       const stored = await t.prisma.calendarEvent.findUniqueOrThrow({
         where: { id: event.id },
@@ -381,7 +384,7 @@ describe('Security review regressions', () => {
       const response = await t
         .http()
         .post(api('/sales-documents'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send(quoteBody(s.project.customerId, s.project.id));
       expect(response.status).toBe(403);
     });
@@ -408,7 +411,7 @@ describe('Security review regressions', () => {
           t,
           method,
         )(api(path))
-          .set(bearer(s.memberToken))
+          .set(asUser(s.memberToken))
           .send(body);
         expect(`${method} ${path} -> ${response.status}`).toBe(
           `${method} ${path} -> 403`,
@@ -438,7 +441,7 @@ describe('Security review regressions', () => {
       const move = await t
         .http()
         .patch(api(`/sales-documents/${id}`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ projectId: s.project.id });
       expect(move.status).toBe(403);
       const stored = await t.prisma.salesDocument.findUniqueOrThrow({
@@ -459,7 +462,7 @@ describe('Security review regressions', () => {
       const order = await t
         .http()
         .post(api('/purchase-orders'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({
           supplierId: supplier.id,
           projectId: s.project.id,
@@ -507,7 +510,7 @@ describe('Security review regressions', () => {
           t,
           method,
         )(api(path))
-          .set(bearer(s.memberToken))
+          .set(asUser(s.memberToken))
           .send(body);
         expect(`${path} -> ${response.status}`).toBe(`${path} -> 403`);
       }
@@ -535,7 +538,7 @@ describe('Security review regressions', () => {
       const response = await t
         .http()
         .post(api('/reservations'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send(body);
       expect(response.status).toBe(403);
 
@@ -543,7 +546,7 @@ describe('Security review regressions', () => {
       const status = await t
         .http()
         .post(api(`/reservations/${id}/status`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ status: 'CANCELLED' });
       expect(status.status).toBe(403);
     });
@@ -564,7 +567,7 @@ describe('Security review regressions', () => {
       const create = await t
         .http()
         .post(api('/recurring-invoices'))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send(body);
       expect(create.status).toBe(403);
 
@@ -577,7 +580,7 @@ describe('Security review regressions', () => {
           t,
           method,
         )(api(path))
-          .set(bearer(s.adminToken))
+          .set(asUser(s.adminToken))
           .send({});
         expect(`${path} -> ${response.status}`).toBe(`${path} -> 403`);
       }
@@ -600,13 +603,13 @@ describe('Security review regressions', () => {
       const remove = await t
         .http()
         .delete(api(`/time-entries/${entry.id}`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(remove.status).toBe(403);
       // Billing by customer only (no projectId in the request) still touches the project.
       const bill = await t
         .http()
         .post(api('/time-entries/invoice'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ customerId: s.project.customerId });
       expect(bill.status).toBe(403);
       const stored = await t.prisma.timeEntry.findUniqueOrThrow({
@@ -632,7 +635,7 @@ describe('Security review regressions', () => {
       const response = await t
         .http()
         .post(api(`/ai/proposals/${proposal.id}/approve`))
-        .set(bearer(s.adminToken));
+        .set(asUser(s.adminToken));
       expect((response.body as { status: string }).status).toBe('FAILED');
       expect(await t.prisma.task.count()).toBe(0);
     });
@@ -704,7 +707,7 @@ describe('Security review regressions', () => {
         const response = await t
           .http()
           .post(api(path))
-          .set(bearer(s.memberToken))
+          .set(asUser(s.memberToken))
           .send(body);
         expect(`${path} -> ${response.status}`).toBe(`${path} -> 201`);
       }
@@ -759,7 +762,7 @@ describe('Security review regressions', () => {
           t
             .http()
             .post(api(`/users/${victim.id}/deactivate`))
-            .set(bearer(s.adminToken))
+            .set(asUser(s.adminToken))
             .then((r) => r),
         (tx) =>
           tx.organizationMember.updateMany({
@@ -783,7 +786,7 @@ describe('Security review regressions', () => {
           t
             .http()
             .patch(api(`/users/${s.member.id}/role`))
-            .set(bearer(s.adminToken))
+            .set(asUser(s.adminToken))
             .send({ role: 'ADMIN' })
             .then((r) => r),
         (tx) =>
@@ -808,7 +811,7 @@ describe('Security review regressions', () => {
           t
             .http()
             .post(api(`/projects/${project.id}/members`))
-            .set(bearer(s.adminToken))
+            .set(asUser(s.adminToken))
             .send({ userId: s.member.id, role: 'MANAGER' })
             .then((r) => r),
         (tx) =>
@@ -830,7 +833,7 @@ describe('Security review regressions', () => {
           t
             .http()
             .post(api(`/users/${victim.id}/deactivate`))
-            .set(bearer(s.adminToken))
+            .set(asUser(s.adminToken))
             .then((r) => r),
         () => Promise.resolve(),
       );
@@ -1001,7 +1004,7 @@ describe('Security review regressions', () => {
         const response = await t
           .http()
           .get(route.path)
-          .set(bearer(s.memberToken));
+          .set(asUser(s.memberToken));
         if (response.status === 200) open.push(route.path);
       }
       expect(open).toEqual([]);
@@ -1022,7 +1025,7 @@ describe('Security review regressions', () => {
           t,
           route.method,
         )(path)
-          .set(bearer(s.memberToken))
+          .set(asUser(s.memberToken))
           .send({});
         if (response.status !== 403) {
           notForbidden.push(
@@ -1045,7 +1048,7 @@ describe('Security review regressions', () => {
       const failures: string[] = [];
       for (const token of [s.ownerToken, s.adminToken]) {
         for (const route of reads) {
-          const response = await t.http().get(route.path).set(bearer(token));
+          const response = await t.http().get(route.path).set(asUser(token));
           if (response.status !== 200) {
             failures.push(`${route.path} -> ${response.status}`);
           }
@@ -1068,7 +1071,7 @@ describe('Security review regressions', () => {
         const response = await t
           .http()
           .get(api(path))
-          .set(bearer(s.memberToken));
+          .set(asUser(s.memberToken));
         expect(`${path} -> ${response.status}`).toBe(`${path} -> 200`);
       }
     });
@@ -1114,12 +1117,12 @@ describe('Security review regressions', () => {
       const list = await t
         .http()
         .get(api('/notifications'))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(JSON.stringify(list.body)).not.toContain(notification.id);
       await t
         .http()
         .post(api(`/notifications/${notification.id}/read`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       const stored = await t.prisma.notification.findUniqueOrThrow({
         where: { id: notification.id },
       });

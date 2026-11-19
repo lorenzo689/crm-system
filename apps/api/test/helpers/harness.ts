@@ -1,14 +1,20 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import * as bcrypt from 'bcrypt';
 import request from 'supertest';
-import type { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
+import { configureApp } from '../../src/app-setup';
 import { PrismaService } from '../../src/common/prisma/prisma.service';
-import { STORAGE_SERVICE } from '../../src/common/storage/storage.interface';
+import {
+  STORAGE_SERVICE,
+  type StorageService,
+} from '../../src/common/storage/storage.interface';
 import { AuthMailService } from '../../src/modules/auth/auth-mail.service';
+import { getSessionCookieConfig } from '../../src/modules/auth/session-cookie';
 import type {
   OrganizationMemberRole,
   OrganizationStatus,
@@ -25,13 +31,40 @@ export interface TestApp {
   http: () => ReturnType<typeof request>;
 }
 
+/** Object storage held in memory, for upload/download round trips. */
+export function createMemoryStorage(): StorageService & {
+  files: Map<string, Buffer>;
+} {
+  const files = new Map<string, Buffer>();
+  return {
+    files,
+    upload: ({ key, data }) => {
+      files.set(key, data);
+      return Promise.resolve();
+    },
+    download: (key) => {
+      const data = files.get(key);
+      return data
+        ? Promise.resolve(data)
+        : Promise.reject(new Error('not found'));
+    },
+    delete: (key) => {
+      files.delete(key);
+      return Promise.resolve();
+    },
+    exists: (key) => Promise.resolve(files.has(key)),
+    createDownloadUrl: (key) =>
+      Promise.resolve(`https://storage.test/${encodeURIComponent(key)}`),
+  };
+}
+
 export async function createTestApp(
-  options: { throttling?: boolean } = {},
+  options: { throttling?: boolean; storage?: StorageService } = {},
 ): Promise<TestApp> {
   const mails: TestApp['mails'] = [];
   let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(STORAGE_SERVICE)
-    .useValue({})
+    .useValue(options.storage ?? {})
     .overrideProvider(AuthMailService)
     .useValue({
       isConfigured: () => true,
@@ -54,23 +87,25 @@ export async function createTestApp(
   }
 
   const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication();
-  app.setGlobalPrefix('api/v1');
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  // Same HTTP pipeline as production (CORS, Origin check, JSON-only bodies).
+  const app = moduleRef.createNestApplication<NestExpressApplication>({
+    bodyParser: false,
+  });
+  configureApp(app);
   await app.init();
+  // Scheduled jobs (reminders every minute, session purge, inbox …) would run
+  // concurrently with resetDatabase's TRUNCATE and can deadlock it. Tests call
+  // the jobs they need directly instead.
+  for (const job of app.get(SchedulerRegistry).getCronJobs().values()) {
+    void job.stop();
+  }
 
   return {
     app,
     prisma: app.get(PrismaService),
     jwt: app.get(JwtService),
     mails,
-    http: () => request(app.getHttpServer() as App),
+    http: () => request(app.getHttpServer()),
   };
 }
 
@@ -114,19 +149,55 @@ export async function createUser(
   });
 }
 
+/** CSRF token handed out with each session, keyed by the cookie value. */
+const csrfBySession = new Map<string, string>();
+
+export const sessionCookieName = () => getSessionCookieConfig().name;
+
+/** Set-Cookie headers of a response as an array. */
+export function setCookies(response: { headers: Record<string, unknown> }) {
+  const raw = response.headers['set-cookie'];
+  if (Array.isArray(raw)) return raw.map(String);
+  return typeof raw === 'string' ? [raw] : [];
+}
+
+/** Value of the session cookie a response set, or '' if none. */
+export function sessionCookieFrom(response: {
+  headers: Record<string, unknown>;
+}) {
+  const prefix = `${sessionCookieName()}=`;
+  const header = setCookies(response).find((c) => c.startsWith(prefix));
+  return header
+    ? decodeURIComponent(header.slice(prefix.length).split(';')[0])
+    : '';
+}
+
+/**
+ * Logs in like the browser does. `token` is the session cookie value (the
+ * signed session JWT); `csrf` is what the login body returned.
+ */
+export interface LoginResult {
+  status: number;
+  token: string;
+  csrf: string;
+  response: { headers: Record<string, unknown>; body: unknown };
+}
+
 export async function loginAs(
   t: TestApp,
   user: { email: string },
   password = PASSWORD,
-) {
+): Promise<LoginResult> {
   const response = await t
     .http()
     .post('/api/v1/auth/login')
     .send({ email: user.email, password });
-  return {
-    status: response.status,
-    token: (response.body as { accessToken?: string }).accessToken ?? '',
-  };
+  const token = sessionCookieFrom(response);
+  const csrf = (response.body as { csrfToken?: string }).csrfToken ?? '';
+  if (token && csrf) {
+    csrfBySession.set(token, csrf);
+  }
+  return { status: response.status, token, csrf, response };
 }
 
 export async function tokenFor(t: TestApp, user: { email: string }) {
@@ -155,4 +226,20 @@ export async function createProject(
   });
 }
 
-export const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
+/** Cookie header carrying the given session cookie value. */
+export const sessionCookie = (token: string) => ({
+  Cookie: `${sessionCookieName()}=${encodeURIComponent(token)}`,
+});
+
+/**
+ * What the browser sends for a logged-in user: the session cookie plus the
+ * session's CSRF token (only known for sessions created through loginAs).
+ */
+export function asUser(token: string): Record<string, string> {
+  const csrf = csrfBySession.get(token);
+  return csrf
+    ? { ...sessionCookie(token), 'X-CSRF-Token': csrf }
+    : sessionCookie(token);
+}
+
+export const csrfFor = (token: string) => csrfBySession.get(token) ?? '';
