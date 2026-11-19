@@ -1,11 +1,12 @@
 import {
-  bearer,
+  asUser,
   createOrganization,
   createTestApp,
   createUser,
   loginAs,
   PASSWORD,
   resetDatabase,
+  sessionCookie,
   type TestApp,
   tokenFor,
 } from './helpers/harness';
@@ -69,7 +70,7 @@ describe('Authentication (integration)', () => {
       const { status, token } = await loginAs(t, user);
       expect(status).toBe(201);
 
-      const me = await t.http().get(PROTECTED).set(bearer(token));
+      const me = await t.http().get(PROTECTED).set(asUser(token));
       expect(me.status).toBe(200);
       expect(me.body).toMatchObject({ email: user.email });
     });
@@ -111,79 +112,126 @@ describe('Authentication (integration)', () => {
     });
   });
 
-  describe('JWT validation', () => {
+  describe('JWT validation (against a live, stored session)', () => {
     const secret = () => process.env.JWT_SECRET as string;
+    const encode = (value: object) =>
+      Buffer.from(JSON.stringify(value)).toString('base64url');
 
-    it('rejects an expired token', async () => {
-      const org = await createOrganization(t.prisma);
-      const user = await createUser(t.prisma, org.id);
-      const expired = t.jwt.sign(
-        { sub: user.id, email: user.email, tv: 0 },
-        { secret: secret(), algorithm: 'HS256', expiresIn: -10 },
-      );
-      const response = await t.http().get(PROTECTED).set(bearer(expired));
-      expect(response.status).toBe(401);
-    });
-
-    it('rejects a tampered token', async () => {
+    /**
+     * Logs in for real, so sid/jti point at a stored, unrevoked session row.
+     * Every forgery below reuses these claims, so it can only fail on the
+     * property under test (algorithm, signature, expiry, claim set) and not
+     * merely because a session id is missing.
+     */
+    async function liveSession() {
       const org = await createOrganization(t.prisma);
       const user = await createUser(t.prisma, org.id);
       const token = await tokenFor(t, user);
+      const claims = t.jwt.decode<{
+        sub: string;
+        email: string;
+        tv: number;
+        sid: string;
+        jti: string;
+      }>(token);
+      const { sub, email, tv, sid, jti } = claims;
+      return { user, token, claims: { sub, email, tv, sid, jti } };
+    }
+    const status = async (cookieValue: string) =>
+      (await t.http().get(PROTECTED).set(sessionCookie(cookieValue))).status;
+
+    it('positive control: the same claims, correctly signed, are accepted', async () => {
+      const { claims } = await liveSession();
+      const resigned = t.jwt.sign(claims, {
+        secret: secret(),
+        algorithm: 'HS256',
+        expiresIn: 600,
+      });
+      expect(await status(resigned)).toBe(200);
+    });
+
+    it('rejects an expired JWT although its session row is live', async () => {
+      const { claims } = await liveSession();
+      const expired = t.jwt.sign(claims, {
+        secret: secret(),
+        algorithm: 'HS256',
+        expiresIn: -10,
+      });
+      expect(await status(expired)).toBe(401);
+    });
+
+    it('rejects a tampered payload that keeps the original signature', async () => {
+      const { token, claims } = await liveSession();
       const [header, , signature] = token.split('.');
-      const forgedPayload = Buffer.from(
-        JSON.stringify({ sub: user.id, email: 'evil@x.de', tv: 0, exp: 9e9 }),
-      ).toString('base64url');
-      const response = await t
-        .http()
-        .get(PROTECTED)
-        .set(bearer(`${header}.${forgedPayload}.${signature}`));
-      expect(response.status).toBe(401);
+      const forged = encode({ ...claims, email: 'evil@x.de', exp: 9e9 });
+      expect(await status(`${header}.${forged}.${signature}`)).toBe(401);
     });
 
-    it('rejects a token signed with another algorithm', async () => {
-      const org = await createOrganization(t.prisma);
-      const user = await createUser(t.prisma, org.id);
-      const hs512 = t.jwt.sign(
-        { sub: user.id, email: user.email, tv: 0 },
-        { secret: secret(), algorithm: 'HS512', expiresIn: 600 },
-      );
-      expect((await t.http().get(PROTECTED).set(bearer(hs512))).status).toBe(
-        401,
-      );
+    it('rejects a JWT signed with another key', async () => {
+      const { claims } = await liveSession();
+      const foreign = t.jwt.sign(claims, {
+        secret: 'another-secret-0123456789-abcdefghijklmnopqrstuvwxyz',
+        algorithm: 'HS256',
+        expiresIn: 600,
+      });
+      expect(await status(foreign)).toBe(401);
     });
 
-    it('rejects an unsigned "alg: none" token', async () => {
-      const org = await createOrganization(t.prisma);
-      const user = await createUser(t.prisma, org.id);
-      const encode = (value: object) =>
-        Buffer.from(JSON.stringify(value)).toString('base64url');
+    it('rejects a JWT signed with another algorithm (HS512)', async () => {
+      const { claims } = await liveSession();
+      const hs512 = t.jwt.sign(claims, {
+        secret: secret(),
+        algorithm: 'HS512',
+        expiresIn: 600,
+      });
+      expect(await status(hs512)).toBe(401);
+    });
+
+    it('rejects an unsigned "alg: none" JWT', async () => {
+      const { claims } = await liveSession();
       const unsigned = `${encode({ alg: 'none', typ: 'JWT' })}.${encode({
-        sub: user.id,
-        email: user.email,
-        tv: 0,
+        ...claims,
         exp: 9e9,
       })}.`;
-      expect((await t.http().get(PROTECTED).set(bearer(unsigned))).status).toBe(
-        401,
-      );
+      expect(await status(unsigned)).toBe(401);
     });
 
-    it('rejects a validly signed token that carries no token version', async () => {
-      const org = await createOrganization(t.prisma);
-      const user = await createUser(t.prisma, org.id);
+    it('rejects a correctly signed JWT that carries no token version', async () => {
+      const { claims } = await liveSession();
+      const { sub, email, sid, jti } = claims;
       const legacy = t.jwt.sign(
-        { sub: user.id, email: user.email },
+        { sub, email, sid, jti },
         { secret: secret(), algorithm: 'HS256', expiresIn: 600 },
       );
-      expect((await t.http().get(PROTECTED).set(bearer(legacy))).status).toBe(
-        401,
-      );
+      expect(await status(legacy)).toBe(401);
+    });
+
+    it('rejects a valid JWT whose session row was revoked', async () => {
+      const { token, claims } = await liveSession();
+      await t.prisma.userSession.update({
+        where: { id: claims.sid },
+        data: { revokedAt: new Date() },
+      });
+      expect(await status(token)).toBe(401);
+    });
+
+    it('rejects a valid JWT whose session row has expired', async () => {
+      const { token, claims } = await liveSession();
+      await t.prisma.userSession.update({
+        where: { id: claims.sid },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      expect(await status(token)).toBe(401);
+    });
+
+    it('rejects a valid JWT whose session row was deleted', async () => {
+      const { token, claims } = await liveSession();
+      await t.prisma.userSession.delete({ where: { id: claims.sid } });
+      expect(await status(token)).toBe(401);
     });
 
     it('issues tokens that live at most 8 hours', async () => {
-      const org = await createOrganization(t.prisma);
-      const user = await createUser(t.prisma, org.id);
-      const token = await tokenFor(t, user);
+      const { token } = await liveSession();
       const { iat, exp } = t.jwt.decode<{ iat: number; exp: number }>(token);
       expect(exp - iat).toBeLessThanOrEqual(8 * 60 * 60);
     });
@@ -202,17 +250,17 @@ describe('Authentication (integration)', () => {
       const adminToken = await tokenFor(t, admin);
 
       expect(
-        (await t.http().get(PROTECTED).set(bearer(memberToken))).status,
+        (await t.http().get(PROTECTED).set(asUser(memberToken))).status,
       ).toBe(200);
 
       const lock = await t
         .http()
         .post(`/api/v1/users/${member.id}/deactivate`)
-        .set(bearer(adminToken));
+        .set(asUser(adminToken));
       expect(lock.status).toBe(200);
 
       expect(
-        (await t.http().get(PROTECTED).set(bearer(memberToken))).status,
+        (await t.http().get(PROTECTED).set(asUser(memberToken))).status,
       ).toBe(401);
       expect((await loginAs(t, member)).status).toBe(401);
     });
@@ -225,7 +273,7 @@ describe('Authentication (integration)', () => {
         where: { id: user.id },
         data: { archivedAt: new Date() },
       });
-      expect((await t.http().get(PROTECTED).set(bearer(token))).status).toBe(
+      expect((await t.http().get(PROTECTED).set(asUser(token))).status).toBe(
         401,
       );
     });
@@ -238,7 +286,7 @@ describe('Authentication (integration)', () => {
         where: { id: org.id },
         data: { status: 'SUSPENDED' },
       });
-      expect((await t.http().get(PROTECTED).set(bearer(token))).status).toBe(
+      expect((await t.http().get(PROTECTED).set(asUser(token))).status).toBe(
         401,
       );
     });
@@ -250,7 +298,7 @@ describe('Authentication (integration)', () => {
       await t.prisma.organizationMember.deleteMany({
         where: { userId: user.id },
       });
-      expect((await t.http().get(PROTECTED).set(bearer(token))).status).toBe(
+      expect((await t.http().get(PROTECTED).set(asUser(token))).status).toBe(
         401,
       );
     });
@@ -259,7 +307,7 @@ describe('Authentication (integration)', () => {
       const org = await createOrganization(t.prisma);
       const user = await createUser(t.prisma, org.id);
       const token = await tokenFor(t, user);
-      expect((await t.http().get(PROTECTED).set(bearer(token))).status).toBe(
+      expect((await t.http().get(PROTECTED).set(asUser(token))).status).toBe(
         200,
       );
 
@@ -267,12 +315,12 @@ describe('Authentication (integration)', () => {
         where: { id: user.id },
         data: { tokenVersion: { increment: 1 } },
       });
-      expect((await t.http().get(PROTECTED).set(bearer(token))).status).toBe(
+      expect((await t.http().get(PROTECTED).set(asUser(token))).status).toBe(
         401,
       );
       // A fresh login carries the new version and works.
       const fresh = await tokenFor(t, user);
-      expect((await t.http().get(PROTECTED).set(bearer(fresh))).status).toBe(
+      expect((await t.http().get(PROTECTED).set(asUser(fresh))).status).toBe(
         200,
       );
     });
@@ -286,10 +334,10 @@ describe('Authentication (integration)', () => {
       const response = await t
         .http()
         .post(`/api/v1/users/${member.id}/revoke-sessions`)
-        .set(bearer(await tokenFor(t, owner)));
+        .set(asUser(await tokenFor(t, owner)));
       expect(response.status).toBe(200);
       expect(
-        (await t.http().get(PROTECTED).set(bearer(memberToken))).status,
+        (await t.http().get(PROTECTED).set(asUser(memberToken))).status,
       ).toBe(401);
       expect((await loginAs(t, member)).status).toBe(201);
     });
@@ -320,7 +368,7 @@ describe('Authentication (integration)', () => {
       const done = await reset(resetToken, 'N3w!Passwort-xyz');
       expect(done.status).toBe(201);
 
-      expect((await t.http().get(PROTECTED).set(bearer(oldToken))).status).toBe(
+      expect((await t.http().get(PROTECTED).set(asUser(oldToken))).status).toBe(
         401,
       );
       expect((await loginAs(t, user)).status).toBe(401);

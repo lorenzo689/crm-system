@@ -30,7 +30,15 @@ function createService() {
     user: { update: jest.fn() },
   };
   const prisma = {
-    user: { findFirst: jest.fn() },
+    user: {
+      findFirst: jest.fn(),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({
+        id: 'u1',
+        email: 'a@b.de',
+        displayName: 'A B',
+        organizationRoles: [{ organization: { id: 'org1', name: 'Org' } }],
+      }),
+    },
     passwordResetToken: { create: jest.fn(), updateMany: jest.fn() },
     $transaction: jest.fn((arg: unknown) =>
       typeof arg === 'function'
@@ -38,13 +46,34 @@ function createService() {
         : Promise.resolve([]),
     ),
   };
-  const jwt = { sign: jest.fn().mockReturnValue('signed') };
+  const jwt = {
+    sign: jest.fn().mockReturnValue('signed'),
+    verify: jest.fn(() => {
+      throw new Error('invalid');
+    }),
+  };
+  const sessions = {
+    create: jest.fn().mockResolvedValue({
+      cookieValue: 'cookie-jwt',
+      sessionId: 'sess-1',
+      expiresAt: new Date('2030-01-01T00:00:00Z'),
+      csrfToken: 'csrf',
+    }),
+    revoke: jest.fn(),
+    revokeAllForUser: jest.fn(),
+    findActive: jest.fn(),
+  };
   const mail = {
     isConfigured: jest.fn().mockReturnValue(true),
     sendPasswordReset: jest.fn(),
   };
-  const service = new AuthService(prisma as never, jwt as never, mail as never);
-  return { service, prisma, tx, jwt, mail };
+  const service = new AuthService(
+    prisma as never,
+    jwt as never,
+    mail as never,
+    sessions as never,
+  );
+  return { service, prisma, tx, jwt, mail, sessions };
 }
 
 type MockCalls = { mock: { calls: unknown[][] } };
@@ -55,17 +84,35 @@ const credentials = { email: 'a@b.de', password: 'Passw0rd!xyz' };
 
 describe('AuthService', () => {
   describe('login', () => {
-    it('returns a token carrying the current token version', async () => {
-      const { service, prisma, jwt } = createService();
+    it('opens a new session and never puts the cookie value in the body', async () => {
+      const { service, prisma, sessions } = createService();
       prisma.user.findFirst.mockResolvedValue(accountState());
-      await expect(service.login(credentials)).resolves.toEqual({
-        accessToken: 'signed',
+      const result = await service.login(credentials, null);
+
+      expect(sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'u1', tokenVersion: 3 }),
+      );
+      expect(result.issued.cookieValue).toBe('cookie-jwt');
+      expect(JSON.stringify(result.body)).not.toContain('cookie-jwt');
+      expect(result.body).toMatchObject({
+        user: { id: 'u1', email: 'a@b.de' },
+        organization: { id: 'org1' },
+        role: 'MEMBER',
       });
-      expect(jwt.sign).toHaveBeenCalledWith({
-        sub: 'u1',
-        email: 'a@b.de',
-        tv: 3,
-      });
+      expect(typeof result.body.csrfToken).toBe('string');
+    });
+
+    it('revokes a validly signed session the browser already presented', async () => {
+      const { service, prisma, sessions, jwt } = createService();
+      prisma.user.findFirst.mockResolvedValue(accountState());
+      jwt.verify.mockReturnValue({
+        sub: 'someone',
+        sid: 'old-session',
+        jti: 'x',
+        tv: 0,
+      } as never);
+      await service.login(credentials, 'old-cookie');
+      expect(sessions.revoke).toHaveBeenCalledWith('old-session');
     });
 
     it.each([
@@ -87,7 +134,7 @@ describe('AuthService', () => {
     ])('rejects %s with the generic message', async (_name, account) => {
       const { service, prisma } = createService();
       prisma.user.findFirst.mockResolvedValue(account);
-      await expect(service.login(credentials)).rejects.toThrow(
+      await expect(service.login(credentials, null)).rejects.toThrow(
         new UnauthorizedException('E-Mail oder Passwort falsch'),
       );
     });
@@ -96,7 +143,7 @@ describe('AuthService', () => {
       const { service, prisma } = createService();
       prisma.user.findFirst.mockResolvedValue(accountState());
       await expect(
-        service.login({ ...credentials, password: 'Wrong0ne!xyz' }),
+        service.login({ ...credentials, password: 'Wrong0ne!xyz' }, null),
       ).rejects.toThrow('E-Mail oder Passwort falsch');
     });
   });

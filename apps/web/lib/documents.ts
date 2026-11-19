@@ -1,5 +1,4 @@
 import { apiFetch } from "@/lib/auth-api";
-import { ACCESS_TOKEN_KEY } from "@/lib/session";
 
 export type DocumentType =
   | "GENERAL"
@@ -97,24 +96,17 @@ export async function uploadDocumentVersion(
   const formData = new FormData();
   formData.append("file", file);
 
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
-
-  const response = await fetch(`${apiUrl}/documents/${documentId}/versions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      message?: string | string[];
-    } | null;
-    const message = Array.isArray(body?.message)
-      ? body.message.join(" ")
-      : body?.message;
-    throw new Error(translateUploadError(message));
+  // apiFetch sends the session cookie and CSRF token and leaves the
+  // multipart Content-Type to the browser.
+  try {
+    await apiFetch(`/documents/${documentId}/versions`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (error) {
+    throw new Error(
+      translateUploadError(error instanceof Error ? error.message : undefined),
+    );
   }
 }
 

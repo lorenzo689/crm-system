@@ -1,5 +1,5 @@
 import {
-  bearer,
+  asUser,
   createOrganization,
   createProject,
   createTestApp,
@@ -51,7 +51,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const project = await t
         .http()
         .post(api('/projects'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({
           customerId: customer.id,
           name: 'Neues Projekt',
@@ -62,21 +62,21 @@ describe('Authorization and organization isolation (integration)', () => {
       const task = await t
         .http()
         .post(api('/tasks'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ title: 'Aufgabe', projectId: s.project.id });
       expect(task.status).toBe(201);
 
       const note = await t
         .http()
         .post(api('/notes'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ content: 'Hallo', projectId: s.project.id });
       expect(note.status).toBe(201);
 
       const update = await t
         .http()
         .patch(api(`/projects/${s.project.id}`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ name: 'Umbenannt' });
       expect(update.status).toBe(200);
     });
@@ -86,7 +86,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const response = await t
         .http()
         .get(api('/users'))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(3);
     });
@@ -107,7 +107,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const add = await t
         .http()
         .post(api(`/projects/${s.project.id}/members`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ userId: s.member.id, role: 'MANAGER' });
       expect(add.status).toBe(403);
 
@@ -121,13 +121,13 @@ describe('Authorization and organization isolation (integration)', () => {
       const update = await t
         .http()
         .patch(api(`/projects/${s.project.id}/members/${s.member.id}`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ role: 'OWNER' });
       expect(update.status).toBe(403);
       const remove = await t
         .http()
         .delete(api(`/projects/${s.project.id}/members/${s.member.id}`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(remove.status).toBe(403);
       expect(await t.prisma.projectMember.count()).toBe(1);
     });
@@ -142,7 +142,7 @@ describe('Authorization and organization isolation (integration)', () => {
         const response = await t
           .http()
           [method](api(path))
-          .set(bearer(s.memberToken))
+          .set(asUser(s.memberToken))
           .send(body);
         expect(response.status).toBe(403);
       }
@@ -158,21 +158,21 @@ describe('Authorization and organization isolation (integration)', () => {
       const add = await t
         .http()
         .post(api(`/projects/${s.project.id}/members`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ userId: s.member.id, role: 'CONTRIBUTOR' });
       expect(add.status).toBe(201);
 
       const update = await t
         .http()
         .patch(api(`/projects/${s.project.id}/members/${s.member.id}`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ role: 'VIEWER' });
       expect(update.status).toBe(200);
 
       const remove = await t
         .http()
         .delete(api(`/projects/${s.project.id}/members/${s.member.id}`))
-        .set(bearer(s.adminToken));
+        .set(asUser(s.adminToken));
       expect(remove.status).toBe(200);
     });
 
@@ -185,7 +185,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const response = await t
         .http()
         .post(api(`/projects/${s.project.id}/members`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ userId: s.member.id, role: 'VIEWER' });
       expect(response.status).toBe(403);
     });
@@ -197,21 +197,21 @@ describe('Authorization and organization isolation (integration)', () => {
       const promote = await t
         .http()
         .patch(api(`/users/${s.member.id}/role`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ role: 'ADMIN' });
       expect(promote.status).toBe(200);
 
       const grantOwner = await t
         .http()
         .patch(api(`/users/${s.member.id}/role`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ role: 'OWNER' });
       expect(grantOwner.status).toBe(403);
 
       const selfEscalate = await t
         .http()
         .patch(api(`/users/${s.admin.id}/role`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ role: 'OWNER' });
       expect(selfEscalate.status).toBe(403);
 
@@ -226,18 +226,18 @@ describe('Authorization and organization isolation (integration)', () => {
       const demote = await t
         .http()
         .patch(api(`/users/${s.owner.id}/role`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ role: 'MEMBER' });
       expect(demote.status).toBe(403);
       const lock = await t
         .http()
         .post(api(`/users/${s.owner.id}/deactivate`))
-        .set(bearer(s.adminToken));
+        .set(asUser(s.adminToken));
       expect(lock.status).toBe(403);
       const revoke = await t
         .http()
         .post(api(`/users/${s.owner.id}/revoke-sessions`))
-        .set(bearer(s.adminToken));
+        .set(asUser(s.adminToken));
       expect(revoke.status).toBe(403);
     });
 
@@ -246,7 +246,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const response = await t
         .http()
         .patch(api(`/users/${s.admin.id}/role`))
-        .set(bearer(s.ownerToken))
+        .set(asUser(s.ownerToken))
         .send({ role: 'OWNER' });
       expect(response.status).toBe(200);
     });
@@ -256,13 +256,13 @@ describe('Authorization and organization isolation (integration)', () => {
       const demote = await t
         .http()
         .patch(api(`/users/${s.owner.id}/role`))
-        .set(bearer(s.ownerToken))
+        .set(asUser(s.ownerToken))
         .send({ role: 'ADMIN' });
       expect(demote.status).toBe(409);
       const lock = await t
         .http()
         .post(api(`/users/${s.owner.id}/deactivate`))
-        .set(bearer(s.ownerToken));
+        .set(asUser(s.ownerToken));
       expect(lock.status).toBe(409);
 
       const owner = await t.prisma.user.findUniqueOrThrow({
@@ -279,7 +279,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const demote = await t
         .http()
         .patch(api(`/users/${s.owner.id}/role`))
-        .set(bearer(s.ownerToken))
+        .set(asUser(s.ownerToken))
         .send({ role: 'MEMBER' });
       expect(demote.status).toBe(409);
     });
@@ -293,11 +293,11 @@ describe('Authorization and organization isolation (integration)', () => {
         t
           .http()
           .post(api(`/users/${second.id}/deactivate`))
-          .set(bearer(s.ownerToken)),
+          .set(asUser(s.ownerToken)),
         t
           .http()
           .post(api(`/users/${s.owner.id}/deactivate`))
-          .set(bearer(secondToken)),
+          .set(asUser(secondToken)),
       ]);
       // The request that waited for the lock finds its own actor already locked
       // out by the other one and is rejected as unauthenticated (401). Before
@@ -333,7 +333,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const response = await t
         .http()
         .get(api(`/projects/${s.project.id}`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(response.status).toBe(200);
     });
 
@@ -342,13 +342,13 @@ describe('Authorization and organization isolation (integration)', () => {
       const update = await t
         .http()
         .patch(api(`/projects/${s.project.id}`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ name: 'Hack' });
       expect(update.status).toBe(403);
       const archive = await t
         .http()
         .post(api(`/projects/${s.project.id}/archive`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(archive.status).toBe(403);
       const stored = await t.prisma.project.findUniqueOrThrow({
         where: { id: s.project.id },
@@ -362,25 +362,25 @@ describe('Authorization and organization isolation (integration)', () => {
       const create = await t
         .http()
         .post(api('/tasks'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ title: 'Neu', projectId: s.project.id });
       expect(create.status).toBe(403);
 
       const update = await t
         .http()
         .patch(api(`/tasks/${s.task.id}`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ title: 'Geändert' });
       expect(update.status).toBe(403);
       const complete = await t
         .http()
         .post(api(`/tasks/${s.task.id}/complete`))
-        .set(bearer(s.memberToken));
+        .set(asUser(s.memberToken));
       expect(complete.status).toBe(403);
       const assign = await t
         .http()
         .post(api(`/tasks/${s.task.id}/assignments`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ userId: s.member.id, role: 'RESPONSIBLE' });
       expect(assign.status).toBe(403);
     });
@@ -390,13 +390,13 @@ describe('Authorization and organization isolation (integration)', () => {
       const onProject = await t
         .http()
         .post(api('/notes'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ content: 'x', projectId: s.project.id });
       expect(onProject.status).toBe(403);
       const onTask = await t
         .http()
         .post(api('/notes'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ content: 'x', taskId: s.task.id });
       expect(onTask.status).toBe(403);
     });
@@ -407,7 +407,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const response = await t
         .http()
         .patch(api(`/projects/${other.id}`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ name: 'Anderes Projekt' });
       expect(response.status).toBe(200);
     });
@@ -434,7 +434,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const response = await t
         .http()
         .post(api(`/projects/${s.project.id}/members`))
-        .set(bearer(s.adminToken))
+        .set(asUser(s.adminToken))
         .send({ userId: s.foreignUser.id, role: 'CONTRIBUTOR' });
       expect(response.status).toBe(404);
       expect(await t.prisma.projectMember.count()).toBe(0);
@@ -450,7 +450,7 @@ describe('Authorization and organization isolation (integration)', () => {
         const response = await t
           .http()
           .post(api(`/projects/${s.project.id}/members`))
-          .set(bearer(s.adminToken))
+          .set(asUser(s.adminToken))
           .send({ userId, role: 'CONTRIBUTOR' });
         expect(response.status).toBe(404);
       }
@@ -472,7 +472,7 @@ describe('Authorization and organization isolation (integration)', () => {
         const response = await t
           .http()
           .post(api(`/tasks/${task.id}/assignments`))
-          .set(bearer(s.memberToken))
+          .set(asUser(s.memberToken))
           .send({ userId, role: 'RESPONSIBLE' });
         expect(response.status).toBe(404);
       }
@@ -481,7 +481,7 @@ describe('Authorization and organization isolation (integration)', () => {
       const ok = await t
         .http()
         .post(api(`/tasks/${task.id}/assignments`))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ userId: s.member.id, role: 'RESPONSIBLE' });
       expect(ok.status).toBe(201);
     });
@@ -496,20 +496,20 @@ describe('Authorization and organization isolation (integration)', () => {
         const response = await t
           .http()
           .get(api(path))
-          .set(bearer(s.ownerToken));
+          .set(asUser(s.ownerToken));
         expect(response.status).toBe(404);
       }
 
       const patchProject = await t
         .http()
         .patch(api(`/projects/${s.foreignProject.id}`))
-        .set(bearer(s.ownerToken))
+        .set(asUser(s.ownerToken))
         .send({ name: 'Übernommen' });
       expect(patchProject.status).toBe(404);
       const patchTask = await t
         .http()
         .patch(api(`/tasks/${s.foreignTask.id}`))
-        .set(bearer(s.ownerToken))
+        .set(asUser(s.ownerToken))
         .send({ title: 'Übernommen' });
       expect(patchTask.status).toBe(404);
 
@@ -524,20 +524,20 @@ describe('Authorization and organization isolation (integration)', () => {
       const task = await t
         .http()
         .post(api('/tasks'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ title: 'x', projectId: s.foreignProject.id });
       expect(task.status).toBe(404);
       const note = await t
         .http()
         .post(api('/notes'))
-        .set(bearer(s.memberToken))
+        .set(asUser(s.memberToken))
         .send({ content: 'x', projectId: s.foreignProject.id });
       expect(note.status).toBe(404);
     });
 
     it('does not expose foreign users or let admins manage them', async () => {
       const s = await twoOrganizations();
-      const list = await t.http().get(api('/users')).set(bearer(s.ownerToken));
+      const list = await t.http().get(api('/users')).set(asUser(s.ownerToken));
       expect(
         (list.body as { id: string }[]).some((u) => u.id === s.foreignUser.id),
       ).toBe(false);
@@ -550,7 +550,7 @@ describe('Authorization and organization isolation (integration)', () => {
         const response = await t
           .http()
           [method](api(path))
-          .set(bearer(s.ownerToken))
+          .set(asUser(s.ownerToken))
           .send(body);
         expect(response.status).toBe(404);
       }

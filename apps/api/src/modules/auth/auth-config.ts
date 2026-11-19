@@ -4,6 +4,7 @@
  * that decides which secret, algorithm and lifetime are acceptable.
  */
 import { randomBytes } from 'crypto';
+import { assertOriginConfig } from '../../common/http/request-origin';
 
 export const JWT_ALGORITHM = 'HS256' as const;
 export const JWT_ALGORITHMS = [JWT_ALGORITHM];
@@ -119,4 +120,6 @@ export function assertAuthConfig(env: NodeJS.ProcessEnv = process.env) {
   getJwtSecret(env);
   getJwtExpiresInSeconds(env);
   assertMailConfig(env);
+  // Session cookies and CSRF origin checks need the exact HTTPS origin.
+  assertOriginConfig(env);
 }

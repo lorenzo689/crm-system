@@ -68,6 +68,7 @@ export class UsersAdminService {
         where: { id: targetUserId },
         data: { archivedAt: new Date(), tokenVersion: { increment: 1 } },
       });
+      await this.endAllSessions(tx, targetUserId);
       return { id: targetUserId, active: false };
     });
   }
@@ -79,7 +80,16 @@ export class UsersAdminService {
         where: { id: targetUserId },
         data: { tokenVersion: { increment: 1 } },
       });
+      await this.endAllSessions(tx, targetUserId);
       return { id: targetUserId, sessionsRevoked: true };
+    });
+  }
+
+  /** Revokes the session rows; the tokenVersion bump stays as second barrier. */
+  private async endAllSessions(tx: Tx, userId: string) {
+    await tx.userSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
     });
   }
 

@@ -300,6 +300,7 @@ model User {
   timeEntries              TimeEntry[]            @relation("TimeEntryUser")
   statusChanges            ProjectStatusHistory[]
   passwordResetTokens      PasswordResetToken[]
+  sessions                 UserSession[]
   calendarEventsCreated    CalendarEvent[]
   reminders                Reminder[]
   notifications            Notification[]
@@ -339,6 +340,23 @@ model PasswordResetToken {
 
   @@index([userId, expiresAt])
   @@map("password_reset_tokens")
+}
+
+/// One row per browser login. The cookie carries a signed JWT whose `jti` is
+/// the session secret; only its SHA-256 hash is stored here.
+model UserSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  secretHash String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
 }
 
 model ExternalIdentity {

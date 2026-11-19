@@ -7,6 +7,7 @@ import {
   JWT_ALGORITHM,
 } from './auth-config';
 import { RolesGuard } from './guards/roles.guard';
+import { SessionService } from './session.service';
 import { JwtStrategy } from './strategies/jwt.strategies';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -22,8 +23,14 @@ import { AuthController } from './auth.controller';
       verifyOptions: { algorithms: [JWT_ALGORITHM] },
     }),
   ],
-  providers: [JwtStrategy, AuthMailService, AuthService, RolesGuard],
+  providers: [
+    JwtStrategy,
+    AuthMailService,
+    AuthService,
+    SessionService,
+    RolesGuard,
+  ],
   controllers: [AuthController],
-  exports: [JwtModule, RolesGuard],
+  exports: [JwtModule, RolesGuard, SessionService],
 })
 export class AuthModule {}
