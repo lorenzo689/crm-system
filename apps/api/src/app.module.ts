@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { BackgroundJobsModule } from './common/jobs/background-jobs.service';
 import { MailModule } from './common/mail/mail.module';
 import { StorageModule } from './common/storage/storage.module';
 import { AccessModule } from './modules/access/access.module';
@@ -35,6 +36,7 @@ import { UsersModule } from './modules/users/users.module';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    BackgroundJobsModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     StorageModule,
     MailModule,

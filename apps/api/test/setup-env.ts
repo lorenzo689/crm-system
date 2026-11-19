@@ -10,9 +10,12 @@ process.env.JWT_SECRET =
 process.env.WEB_ORIGIN = 'http://localhost:3000';
 delete process.env.JWT_EXPIRES_IN_MINUTES;
 
+// 127.0.0.1 instead of localhost: on Windows with Docker Desktop, opening new
+// connections via "localhost" intermittently stalls for 10+ seconds (pool
+// timeout -> HTTP 500). The numeric address is stable.
 const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ??
-  'postgresql://bissinger:bissinger_dev@localhost:5432/bissinger_os_test';
+  'postgresql://bissinger:bissinger_dev@127.0.0.1:5432/bissinger_os_test';
 
 const databaseName = new URL(testDatabaseUrl).pathname.replace('/', '');
 if (!databaseName.endsWith('_test')) {

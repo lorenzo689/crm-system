@@ -5,6 +5,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import * as bcrypt from 'bcrypt';
+import { Readable } from 'stream';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/app-setup';
@@ -53,8 +54,16 @@ export function createMemoryStorage(): StorageService & {
       return Promise.resolve();
     },
     exists: (key) => Promise.resolve(files.has(key)),
-    createDownloadUrl: (key) =>
-      Promise.resolve(`https://storage.test/${encodeURIComponent(key)}`),
+    openDownload: (key) => {
+      const data = files.get(key);
+      return data
+        ? Promise.resolve({
+            body: Readable.from([data]),
+            contentLength: data.length,
+          })
+        : Promise.reject(new Error('not found'));
+    },
+    ping: () => Promise.resolve(),
   };
 }
 
@@ -92,12 +101,24 @@ export async function createTestApp(
     bodyParser: false,
   });
   configureApp(app);
-  await app.init();
   // Scheduled jobs (reminders every minute, session purge, inbox …) would run
   // concurrently with resetDatabase's TRUNCATE and can deadlock it. Tests call
   // the jobs they need directly instead.
-  for (const job of app.get(SchedulerRegistry).getCronJobs().values()) {
-    void job.stop();
+  const stopCronJobs = () => {
+    for (const job of app.get(SchedulerRegistry).getCronJobs().values()) {
+      void job.stop();
+    }
+  };
+  try {
+    await app.init();
+    stopCronJobs();
+  } catch (error) {
+    // A start that fails on purpose (e.g. the staging guard) must not leave
+    // running cron jobs and open database connections behind: they keep the
+    // test process alive and fire against a closed pool.
+    stopCronJobs();
+    await app.close().catch(() => undefined);
+    throw error;
   }
 
   return {

@@ -359,6 +359,23 @@ model UserSession {
   @@map("user_sessions")
 }
 
+/// One row per scheduled background job: cluster-wide lease (lockedUntil,
+/// lockedBy) plus the outcome of the last run for monitoring.
+model BackgroundJobRun {
+  name                String    @id
+  lockedUntil         DateTime?
+  lockedBy            String?
+  lastStartedAt       DateTime?
+  lastFinishedAt      DateTime?
+  lastSucceededAt     DateTime?
+  lastStatus          String?
+  lastError           String?
+  consecutiveFailures Int       @default(0)
+  updatedAt           DateTime  @default(now())
+
+  @@map("background_job_runs")
+}
+
 model ExternalIdentity {
   id         String                   @id @default(uuid()) @db.Uuid
   userId     String                   @db.Uuid

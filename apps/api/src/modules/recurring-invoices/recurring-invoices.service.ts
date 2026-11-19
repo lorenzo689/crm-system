@@ -21,6 +21,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Prisma } from '../../../generated/prisma/client';
+import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SalesDocumentItemDto } from '../sales-documents/dto/sales-document.dto';
 import { SalesDocumentsService } from '../sales-documents/sales-documents.service';
@@ -77,6 +78,7 @@ export class RecurringInvoicesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly salesDocuments: SalesDocumentsService,
+    private readonly jobs?: BackgroundJobsService,
   ) {}
 
   list(organizationId: string) {
@@ -146,7 +148,11 @@ export class RecurringInvoicesService {
     return { deleted: true };
   }
 
-  @Cron('0 5 * * *')
+  @Cron('0 5 * * *', { name: 'recurring-invoices' })
+  async runScheduledJob() {
+    await this.jobs?.run('recurring-invoices', () => this.runScheduled());
+  }
+
   async runScheduled() {
     const organizations = await this.prisma.recurringInvoice.findMany({
       where: { active: true, nextRunDate: { lte: new Date() } },
