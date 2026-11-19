@@ -1,0 +1,20 @@
+# TEST ONLY (local verification and CI): stands in for Tailscale Serve.
+#
+# A Caddy with an internal CA terminates HTTPS for STAGING_HOST on
+# 127.0.0.1:${STAGING_TLS_PORT} and forwards to the staging proxy exactly like
+# `tailscale serve` forwards to http://127.0.0.1:<port>. This lets tests use a
+# real HTTPS origin (Secure/__Host- cookies, Origin checks) without joining a
+# tailnet. Never use this file on a real staging host.
+services:
+  tls-gateway:
+    image: caddy:2.11.4-alpine
+    restart: "no"
+    environment:
+      STAGING_HOST: ${STAGING_HOST:?set STAGING_HOST}
+    ports:
+      - "127.0.0.1:${STAGING_TLS_PORT:-8443}:443"
+    volumes:
+      - ./Caddyfile.tls-gateway:/etc/caddy/Caddyfile:ro
+    networks: [ingress]
+    depends_on:
+      proxy: { condition: service_healthy }
