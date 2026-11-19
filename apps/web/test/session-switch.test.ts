@@ -32,6 +32,8 @@ const OWNER_IN_ORG_B: Identity = { ...OWNER_A, sid: "s-owner-b", organization: o
 const csrfOf = (identity: Identity) => `csrf-${identity.sid}`;
 
 /** The browser's cookie jar (one session cookie) and the fake API. */
+let sameOriginCalls = 0;
+
 const server = {
   cookie: null as Identity | null,
   executed: [] as { path: string; as: string }[],
@@ -59,7 +61,10 @@ function sessionBody(identity: Identity) {
 }
 
 async function fakeFetch(input: string | URL | Request, init?: RequestInit) {
-  const url = new URL(String(input));
+  // The client calls the API same-origin (relative /api/v1/...), as behind the
+  // reverse proxy; resolve it against a dummy origin like a browser would.
+  const url = new URL(String(input), "https://app.test");
+  if (!String(input).startsWith("http")) sameOriginCalls += 1;
   const path = url.pathname.replace(/^\/api\/v1/, "");
   const method = (init?.method ?? "GET").toUpperCase();
 
@@ -270,6 +275,16 @@ describe("allowed retry and non-retried errors", () => {
     signInPage(OWNER_A);
     const result = await client.apiFetch<{ as: string }>("/users/me");
     assert.equal(result.as, "owner");
+  });
+});
+
+describe("API base", () => {
+  it("is same-origin (/api/v1): no host name is baked into the client", async () => {
+    signInPage(OWNER_A);
+    const before = sameOriginCalls;
+    await client.apiFetch("/users/me");
+    assert.equal(sameOriginCalls, before + 1);
+    assert.equal(session.API_URL, "/api/v1");
   });
 });
 

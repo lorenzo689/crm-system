@@ -53,7 +53,9 @@ export function identityOf(
 }
 
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+  // Same-origin by default (reverse proxy serves the web app and /api/v1).
+  // Local development sets NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1.
+  process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
 
 const SESSION_NOTICE_KEY = "sessionNotice";
 /** Marks that this tab was signed in, so a later 401 reads as "expired". */

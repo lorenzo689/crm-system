@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/auth-api";
+import { API_URL } from "@/lib/session";
 
 export type DocumentType =
   | "GENERAL"
@@ -114,11 +115,15 @@ export type DocumentDetail = DocumentListItem & {
   versions: DocumentVersion[];
 };
 
-/** Signed URL; `inline` is for previews, `attachment` forces a file download. */
-export async function getDocumentUrl(
+/**
+ * URL of the authenticated streaming endpoint. The browser sends the session
+ * cookie with it (same origin in production); object storage is never
+ * exposed. `inline` is for previews (PDF/images only), `attachment` forces a
+ * download.
+ */
+export function getDocumentUrl(
   documentId: string,
   options: {
-    signal?: AbortSignal;
     disposition?: "inline" | "attachment";
     versionId?: string;
   } = {},
@@ -126,12 +131,9 @@ export async function getDocumentUrl(
   const params = new URLSearchParams();
   params.set("disposition", options.disposition ?? "inline");
   if (options.versionId) params.set("version", options.versionId);
-
-  const { url } = await apiFetch<{ url: string }>(
-    `/documents/${documentId}/download-url?${params.toString()}`,
-    { signal: options.signal },
+  return Promise.resolve(
+    `${API_URL}/documents/${encodeURIComponent(documentId)}/download?${params.toString()}`,
   );
-  return url;
 }
 
 export async function openDocumentDownload(

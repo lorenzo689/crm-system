@@ -113,7 +113,7 @@ export function DocumentPreview({
     if (!versionId || (!isImage && !isPdf)) return;
 
     const controller = new AbortController();
-    getDocumentUrl(document.id, { signal: controller.signal })
+    getDocumentUrl(document.id)
       .then((url) =>
         setPreviewResult({ versionId, state: { status: "ready", url } }),
       )
