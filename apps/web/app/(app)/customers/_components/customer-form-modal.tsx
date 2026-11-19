@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import type { Customer } from "./customer-types";
 
@@ -53,39 +53,25 @@ function mapCustomerError(message: string) {
   return message;
 }
 
-export function CustomerFormModal({
+function CustomerFormModalContent({
   customer,
-  isOpen,
   mode,
   onClose,
   onSaved,
 }: CustomerFormModalProps) {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [formState, setFormState] = useState<FormState>(() =>
+    customer
+      ? {
+          customerNumber: customer.customerNumber,
+          description: customer.description ?? "",
+          name: customer.name,
+          status: customer.status,
+          website: customer.website ?? "",
+        }
+      : initialFormState,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setFormState(
-      customer
-        ? {
-            customerNumber: customer.customerNumber,
-            description: customer.description ?? "",
-            name: customer.name,
-            status: customer.status,
-            website: customer.website ?? "",
-          }
-        : initialFormState,
-    );
-    setError(null);
-  }, [customer, isOpen]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -293,4 +279,15 @@ export function CustomerFormModal({
       </div>
     </div>
   );
+}
+
+/**
+ * Mounted only while open (and re-keyed per record), so every opening starts
+ * from fresh form state without an effect that resets it.
+ */
+export function CustomerFormModal(props: CustomerFormModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+  return <CustomerFormModalContent key={props.customer?.id ?? "new"} {...props} />;
 }
