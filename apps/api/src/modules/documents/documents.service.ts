@@ -280,10 +280,15 @@ export class DocumentsService {
     }
   }
 
-  async getDownloadUrl(
+  /**
+   * Opens the stored file of the current (or a given) version for streaming.
+   * Organisation scoping comes from findOne; the storage key is taken from
+   * the database row, never from the request.
+   */
+  async openDownload(
     documentId: string,
     organizationId: string,
-    options: { disposition?: 'inline' | 'attachment'; versionId?: string } = {},
+    options: { versionId?: string } = {},
   ) {
     const document = await this.findOne(documentId, organizationId);
 
@@ -301,9 +306,12 @@ export class DocumentsService {
       );
     }
 
-    return this.storageService.createDownloadUrl(version.storageKey, 300, {
-      disposition: options.disposition ?? 'inline',
+    const stored = await this.storageService.openDownload(version.storageKey);
+    return {
+      body: stored.body,
+      contentLength: stored.contentLength ?? version.sizeBytes,
       fileName: version.fileName,
-    });
+      mimeType: version.mimeType,
+    };
   }
 }

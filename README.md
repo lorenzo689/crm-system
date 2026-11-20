@@ -40,29 +40,21 @@ pnpm --filter api exec prisma studio
 
 ## Erstes lokales Setup
 
-Nach dem ersten `prisma migrate dev` muss die Basis-Organisation
-`bissinger-lights` einmalig in der Datenbank vorhanden sein, damit die
-Registrierung funktioniert.
+1. Infrastruktur starten und Migrationen anwenden:
 
-Praktischer Dev-Weg:
+   ```bash
+   docker compose -f infrastructure/docker/docker-compose.yml up -d
+   pnpm --filter api exec prisma migrate deploy
+   ```
 
-1. Infrastruktur starten und Migrationen anwenden.
-2. Falls die Organisation noch fehlt, per idempotentem SQL anlegen:
+2. `apps/web/.env.local` aus `apps/web/.env.example` anlegen (`NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1`). Ohne diese Variable ruft das Frontend die API relativ unter `/api/v1` auf; so ist es für Reverse-Proxy-Setups (Staging, Produktion) gedacht.
 
-```bash
-cd apps/api
-pnpm exec prisma db execute --stdin
-```
+3. Den ersten Owner anlegen. Es gibt **keine öffentliche Registrierung**. Der Befehl legt auch die Organisation `bissinger-lights` an, das Passwort wird verdeckt abgefragt:
 
-```sql
-INSERT INTO organizations (id, name, slug, status, "createdAt", "updatedAt")
-VALUES (gen_random_uuid(), 'Bissinger Lights', 'bissinger-lights', 'ACTIVE', NOW(), NOW())
-ON CONFLICT (slug) DO NOTHING;
-```
-
-Alternativ könnt ihr die vorhandenen Test-Skripte in `apps/api/scripts`
-verwenden, wenn ihr den Setup-Flow gezielt mit User und Organisation
-nachbauen wollt.
+   ```bash
+   pnpm --filter api user-admin bootstrap --email admin@bissinger-lights.de --name "Vorname Nachname"
+   pnpm --filter api user-admin create-user --email kollege@bissinger-lights.de --name "Name" --role MEMBER
+   ```
 
 ## Sicherheitskonfiguration (API)
 
@@ -73,6 +65,9 @@ nachbauen wollt.
 - Es gibt keine öffentliche Registrierung. Konten legt ein Administrator per CLI an: `pnpm --filter api user-admin bootstrap …` bzw. `create-user …` (Details: `docs/security/sprint-1-auth-hardening.md`).
 - `TRUST_PROXY`: Anzahl vorgeschalteter Reverse Proxies, damit das Rate-Limiting die echte Client-IP sieht.
 - Passwort-Reset-Tokens liegen nur als SHA-256-Hash in der Datenbank.
+- `BACKGROUND_JOBS`: `all` (Standard), `none`, `maintenance` oder eine Namensliste (`session-purge`, `calendar-reminders`, `inbox-poll`, `ai-agents`, `recurring-invoices`). Mit `APP_ENV=staging` sind nur Wartungsjobs erlaubt.
+- Health: `GET /api/v1/health/live` (Prozess läuft) und `GET /api/v1/health/ready` (Datenbank, Objektspeicher, Migrationen; sonst 503).
+- `LOG_FORMAT=json`: strukturierte Logs mit Request-ID (`X-Request-Id`).
 
 ## KI-Assistent
 
@@ -106,28 +101,26 @@ nachbauen wollt.
 
 Der Hintergrund-Agent (täglich 06:00 Uhr) legt zusätzlich Vorschläge für überfällige Rechnungen, fällige Eingangsrechnungen, unbeantwortete Angebote, Mindestbestände und unabgerechnete Zeiten an. Er braucht keinen API-Key.
 
-## Produktion (Docker)
+## Deployment
 
-```bash
-cd infrastructure/docker
-cp .env.prod.example .env.prod        # alle Werte ausfüllen (DOMAIN, Passwörter, JWT_SECRET, SMTP, S3 ...)
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
-```
-
-Caddy holt automatisch ein HTTPS-Zertifikat für `DOMAIN`; Postgres ist nicht von außen erreichbar; Migrationen laufen vor dem API-Start. Die KI startet, sobald `ANTHROPIC_API_KEY` in `.env.prod` steht. Backups der Volume `pgdata` (z. B. `pg_dump` per Cron) sind nicht Teil dieses Setups.
-
-CI (`.github/workflows/ci.yml`) führt bei jedem Push Migrationen, Typecheck, Tests und Build aus.
+- **Privates Staging** (über Tailscale, nicht öffentlich), inklusive verschlüsselter Backups mit automatisiertem Restore-Test und Monitoring:
+  - [docs/deployment/staging.md](docs/deployment/staging.md)
+  - [docs/deployment/backup-and-restore.md](docs/deployment/backup-and-restore.md)
+  - [docs/deployment/operations-runbook.md](docs/deployment/operations-runbook.md)
+- **Produktion:** noch nicht freigegeben.
+  - `docker-compose.prod.yml` nutzt dieselben Images, braucht aber einen externen S3-Speicher und veröffentlicht 80/443.
+  - Backups sind dort noch **nicht** eingerichtet. Die Staging-Backup-Komponente ist die Vorlage; vor einem Produktivbetrieb kommen Offsite-Backups und ein Restore-Test auf getrennter Hardware dazu.
+- **CI** (`.github/workflows/ci.yml`):
+  - bei jedem PR Typecheck, Unit-, Web- und Integrationstests, Lint und Build
+  - Bau der Container-Images
+  - kompletter Staging-Stack mit Smoke-Test: HTTPS-Origin, Cookies, CSRF, Up- und Download, Hintergrundjobs, Ports, Readiness
+  - Backup und Restore in eine neue Umgebung
 
 ## Rollen
 
-Der erste registrierte Nutzer einer Organisation wird `OWNER`, alle weiteren `MEMBER`.
-Firmendaten (Briefkopf, Bankverbindung) dürfen nur `OWNER` und `ADMIN` ändern.
-Bestehende Nutzer befördert man per SQL:
-
-```sql
-UPDATE organization_members SET role = 'OWNER'
-WHERE "userId" = (SELECT id FROM users WHERE email = 'name@bissinger-lights.de');
-```
+- Den ersten `OWNER` legt `user-admin bootstrap` an, alle weiteren Konten `user-admin create-user` (Rolle `ADMIN` oder `MEMBER`).
+- Rollen ändern `OWNER` und `ADMIN` über die API (`PATCH /api/v1/users/:id/role`). Owner-Konten verwaltet nur ein Owner; der letzte Owner ist geschützt.
+- Finanzen, Auswertungen, Posteingang, Abos und KI-Freigaben sind `OWNER` und `ADMIN` vorbehalten (siehe `docs/security/sprint-1-auth-hardening.md`).
 
 ## Qualitätsprüfungen
 
@@ -137,3 +130,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+Integrationstests (`pnpm --filter api test:e2e`) brauchen eine leere Test-Datenbank, deren Name auf `_test` endet (`TEST_DATABASE_URL`). Lokal unter Windows mit Docker Desktop immer `127.0.0.1` statt `localhost` verwenden (so ist der Standardwert gesetzt): Neue Verbindungen über den Namen `localhost` bleiben dort sporadisch 10 Sekunden hängen, was in den Tests als HTTP 500 („timeout exceeded when trying to connect“) erscheint. Nie zwei Testläufe gleichzeitig gegen dieselbe Datenbank starten.
+
+Die Infrastrukturtests (Container-Images, Staging-Stack, Backup/Restore) laufen mit `infrastructure/tests/staging-smoke.sh` und `restore-test.sh`; Details in `docs/deployment/staging.md`.

@@ -45,6 +45,14 @@ yarn-error.log*
 !.env.example
 !**/.env.example
 !**/.env.prod.example
+!**/.env.staging.example
+
+# staging/production secrets, keys and backups never enter git
+infrastructure/docker/secrets/
+infrastructure/docker/backups/
+*.agekey
+*.age
+.staging-test/
 
 # vercel
 .vercel

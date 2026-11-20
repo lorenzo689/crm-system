@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import type { Prisma } from '../../../generated/prisma/client';
+import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { getJwtExpiresInSeconds } from './auth-config';
 import { csrfTokenFor } from './csrf';
@@ -53,6 +54,7 @@ export class SessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly jobs: BackgroundJobsService,
   ) {}
 
   async create(user: {
@@ -159,8 +161,12 @@ export class SessionService {
     });
   }
 
+  @Cron(CronExpression.EVERY_HOUR, { name: 'session-purge' })
+  async purgeEndedSessionsScheduled() {
+    await this.jobs.run('session-purge', () => this.purgeEndedSessions());
+  }
+
   /** Sessions are never stored indefinitely. */
-  @Cron(CronExpression.EVERY_HOUR)
   async purgeEndedSessions() {
     const cutoff = new Date(Date.now() - ENDED_SESSION_RETENTION_MS);
     const { count } = await this.prisma.userSession.deleteMany({

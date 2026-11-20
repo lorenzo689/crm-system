@@ -1,0 +1,16 @@
+# TEST ONLY: HTTPS terminator that plays the role of Tailscale Serve.
+{
+	admin off
+	local_certs
+	skip_install_trust
+}
+
+https://{$STAGING_HOST} {
+	tls internal
+	# Like tailscale serve: plain HTTP to the loopback-published proxy port.
+	# Caddy appends the client address to X-Forwarded-For, as a Go reverse
+	# proxy does; the staging proxy decides what to trust.
+	reverse_proxy proxy:80 {
+		flush_interval -1
+	}
+}

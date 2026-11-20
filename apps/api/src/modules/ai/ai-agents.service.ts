@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiProposalsService } from './ai-proposals.service';
 
@@ -29,9 +30,14 @@ export class AiAgentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly proposals: AiProposalsService,
+    private readonly jobs?: BackgroundJobsService,
   ) {}
 
-  @Cron('0 6 * * *')
+  @Cron('0 6 * * *', { name: 'ai-agents' })
+  async runScheduledJob() {
+    await this.jobs?.run('ai-agents', () => this.runScheduled());
+  }
+
   async runScheduled() {
     const organizations = await this.prisma.organization.findMany({
       where: { archivedAt: null },

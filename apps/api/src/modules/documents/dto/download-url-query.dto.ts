@@ -1,6 +1,6 @@
 import { IsIn, IsOptional, IsUUID } from 'class-validator';
 
-export class DownloadUrlQueryDto {
+export class DownloadQueryDto {
   @IsOptional()
   @IsIn(['inline', 'attachment'])
   disposition?: 'inline' | 'attachment';

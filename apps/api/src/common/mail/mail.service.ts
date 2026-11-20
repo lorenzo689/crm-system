@@ -1,3 +1,4 @@
+import { maskEmail } from './mask-email';
 import {
   Injectable,
   Logger,
@@ -35,7 +36,8 @@ export class MailService {
       from: this.from,
       ...mail,
     })) as { messageId?: string };
-    this.logger.log(`Mail "${mail.subject}" an ${mail.to} versendet`);
+    // Subject and full address stay out of the log (customer data).
+    this.logger.log(`Mail an ${maskEmail(mail.to)} versendet`);
     return { messageId: info.messageId ?? null };
   }
 

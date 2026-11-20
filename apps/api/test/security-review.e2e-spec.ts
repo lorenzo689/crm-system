@@ -67,6 +67,9 @@ const PUBLIC_ROUTES = new Set([
   // change); with one it requires that session's CSRF token (auth spec).
   'POST /api/v1/auth/logout',
   'GET /api/v1/health',
+  // Liveness/readiness probes (sprint 3): ok/error per dependency, no data.
+  'GET /api/v1/health/live',
+  'GET /api/v1/health/ready',
 ]);
 
 /** Owner/admin-only areas (F-05). */

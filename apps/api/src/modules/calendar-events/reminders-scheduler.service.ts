@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -10,9 +11,14 @@ export class RemindersSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly jobs: BackgroundJobsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_MINUTE, { name: 'calendar-reminders' })
+  async processDueRemindersScheduled() {
+    await this.jobs.run('calendar-reminders', () => this.processDueReminders());
+  }
+
   async processDueReminders() {
     const now = new Date();
 

@@ -747,16 +747,30 @@ describe('Session security (integration)', () => {
       expect(withToken.status).toBe(201);
       expect(storage.files.size).toBe(1);
 
+      // Streamed through the API: same bytes, safe headers, no storage URL.
       const download = await t
         .http()
-        .get(
-          api(`/documents/${documentId}/download-url?disposition=attachment`),
-        )
-        .set(sessionCookie(token));
+        .get(api(`/documents/${documentId}/download?disposition=attachment`))
+        .set(sessionCookie(token))
+        .buffer(true)
+        .parse((res, callback) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
       expect(download.status).toBe(200);
-      expect((download.body as { url: string }).url).toMatch(
-        /^https:\/\/storage\.test\//,
+      expect(Buffer.compare(download.body as Buffer, pdf)).toBe(0);
+      expect(download.headers['content-type']).toBe('application/pdf');
+      expect(download.headers['content-disposition']).toBe(
+        `attachment; filename="plan.pdf"; filename*=UTF-8''plan.pdf`,
       );
+      expect(download.headers['x-content-type-options']).toBe('nosniff');
+      expect(download.headers['cache-control']).toBe('private, no-store');
+
+      // Without a session there is nothing to download.
+      expect(
+        (await t.http().get(api(`/documents/${documentId}/download`))).status,
+      ).toBe(401);
     });
 
     it('protects the AI chat stream; with the token the stream opens', async () => {

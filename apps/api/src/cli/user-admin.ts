@@ -21,7 +21,31 @@ const USAGE = `Bissinger OS Benutzerverwaltung
       Listet Konten, deren E-Mail-Adressen sich nur in Gross-/Kleinschreibung
       unterscheiden (vor der Migration zur eindeutigen E-Mail ausfuehren).
 
-Das Passwort wird immer verdeckt abgefragt, nie als Argument übergeben.`;
+Das Passwort wird verdeckt abgefragt, nie als Argument übergeben.
+Für Automatisierung (Deployment-Skripte, Restore-Tests) liest
+--password-stdin es stattdessen als erste Zeile von der Standardeingabe,
+z. B. aus einer Datei mit Rechten 0600:
+  user-admin bootstrap --email <mail> --name <Name> --password-stdin < pw.txt`;
+
+const PASSWORD_STDIN_FLAG = '--password-stdin';
+
+/** Reads the first line of a non-interactive stdin (never echoed or logged). */
+async function readPasswordFromStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+  }
+  const firstLine = Buffer.concat(chunks)
+    .toString('utf8')
+    .split(String.fromCharCode(10))[0];
+  const password = firstLine.endsWith(String.fromCharCode(13))
+    ? firstLine.slice(0, -1)
+    : firstLine;
+  if (!password) {
+    throw new ProvisioningError('Kein Passwort auf der Standardeingabe.');
+  }
+  return password;
+}
 
 function readFlags(args: string[]) {
   const flags: Record<string, string> = {};
@@ -117,7 +141,8 @@ async function main() {
     return;
   }
 
-  const flags = readFlags(rest);
+  const passwordFromStdin = rest.includes(PASSWORD_STDIN_FLAG);
+  const flags = readFlags(rest.filter((arg) => arg !== PASSWORD_STDIN_FLAG));
   if (!flags.email || !flags.name) {
     throw new ProvisioningError('--email und --name sind erforderlich.');
   }
@@ -132,7 +157,9 @@ async function main() {
     role = flags.role as OrganizationMemberRole;
   }
 
-  const password = await readNewPassword();
+  const password = passwordFromStdin
+    ? await readPasswordFromStdin()
+    : await readNewPassword();
   const prisma = new PrismaService();
   try {
     const input = {

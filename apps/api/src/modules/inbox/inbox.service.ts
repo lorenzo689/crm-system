@@ -7,6 +7,7 @@ import {
   InboundEmailStatus,
   Prisma,
 } from '../../../generated/prisma/client';
+import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiChatService } from '../ai/ai-chat.service';
 import { AiProposalsService } from '../ai/ai-proposals.service';
@@ -32,6 +33,7 @@ export class InboxService {
     private readonly prisma: PrismaService,
     private readonly ai: AiChatService,
     private readonly proposals: AiProposalsService,
+    private readonly jobs?: BackgroundJobsService,
   ) {}
 
   isConfigured() {
@@ -63,7 +65,11 @@ export class InboxService {
     return this.prisma.inboundEmail.update({ where: { id }, data: { status } });
   }
 
-  @Cron('*/5 * * * *')
+  @Cron('*/5 * * * *', { name: 'inbox-poll' })
+  async pollScheduledJob() {
+    await this.jobs?.run('inbox-poll', () => this.pollScheduled());
+  }
+
   async pollScheduled() {
     if (!this.isConfigured()) return;
     try {

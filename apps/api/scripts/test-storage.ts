@@ -7,20 +7,22 @@ async function main() {
   const testContent = Buffer.from('Storage-Roundtrip-Test erfolgreich');
 
   console.log('1. Upload...');
-  await storage.upload({ key: testKey, data: testContent, mimeType: 'text/plain' });
+  await storage.upload({
+    key: testKey,
+    data: testContent,
+    mimeType: 'text/plain',
+  });
   console.log('   OK');
 
   console.log('2. Existenz-Check...');
   const exists = await storage.exists(testKey);
   console.log('   Existiert:', exists);
 
-  console.log('3. Signed Download-URL erzeugen...');
-  const url = await storage.createDownloadUrl(testKey, 60);
-  console.log('   URL:', url);
-
-  console.log('4. Download über die URL...');
-  const response = await fetch(url);
-  const downloadedText = await response.text();
+  console.log('3. Download als Stream...');
+  const { body } = await storage.openDownload(testKey);
+  const chunks: Buffer[] = [];
+  for await (const chunk of body) chunks.push(Buffer.from(chunk as Buffer));
+  const downloadedText = Buffer.concat(chunks).toString();
   console.log('   Inhalt:', downloadedText);
   console.log('   Stimmt überein:', downloadedText === testContent.toString());
 

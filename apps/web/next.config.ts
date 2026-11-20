@@ -1,5 +1,7 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
+// The Content-Security-Policy is set per request with a nonce in proxy.ts.
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -12,18 +14,20 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains",
   },
-  {
-    // Script/style sources are deliberately not restricted: a strict policy
-    // needs per-request nonces (dynamic rendering for every page).
-    key: "Content-Security-Policy",
-    value:
-      "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
-  },
 ];
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
+  // Container builds set NEXT_OUTPUT=standalone (self-contained server.js).
+  // Not the default: standalone output needs symlinks, which local Windows
+  // builds may not be allowed to create.
+  ...(process.env.NEXT_OUTPUT === "standalone" && {
+    output: "standalone" as const,
+    // Monorepo root (the build runs in apps/web): traces packages/ and the
+    // pnpm store so server.js finds every dependency.
+    outputFileTracingRoot: path.join(process.cwd(), "../.."),
+  }),
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -8,6 +8,10 @@ import {
   getAllowedOrigins,
   noStoreMiddleware,
 } from './common/http/request-origin';
+import {
+  RequestIdExceptionFilter,
+  requestContextMiddleware,
+} from './common/http/request-context';
 import { CSRF_HEADER } from './modules/auth/csrf';
 
 /**
@@ -26,6 +30,8 @@ export function configureApp(app: NestExpressApplication) {
     app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
   }
 
+  // Request id + access log first, so even rejected requests are traceable.
+  app.use(requestContextMiddleware);
   app.use(helmet());
   app.use(compression());
   // Rejects foreign origins before any body is parsed or route runs.
@@ -46,6 +52,7 @@ export function configureApp(app: NestExpressApplication) {
     allowedHeaders: ['Content-Type', CSRF_HEADER],
     maxAge: 600,
   });
+  app.useGlobalFilters(new RequestIdExceptionFilter(app.getHttpAdapter()));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
