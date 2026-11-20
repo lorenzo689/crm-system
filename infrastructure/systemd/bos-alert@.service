@@ -1,0 +1,8 @@
+[Unit]
+Description=Deliver a Bissinger OS staging alert for %i
+
+[Service]
+Type=oneshot
+# Reads the webhook URL from /etc/bissinger-staging/alert.env (mode 600, readable by this user).
+User=bos-ops
+ExecStart=/opt/bissinger-os/infrastructure/scripts/alert.sh %i

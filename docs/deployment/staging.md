@@ -6,6 +6,7 @@ Weitere Dokumente:
 
 - Backups und Wiederherstellung: [backup-and-restore.md](backup-and-restore.md)
 - Laufender Betrieb: [operations-runbook.md](operations-runbook.md)
+- Erstinstallation Schritt für Schritt und Abnahme: [staging-acceptance.md](staging-acceptance.md); Host-Prüfung: `infrastructure/scripts/host-preflight.sh`
 
 ## Architektur
 
@@ -199,7 +200,7 @@ age-keygen -o bos-staging-backup.agekey      # privater Schlüssel: offline/Pass
 #    nur die "public key"-Zeile (age1…) auf den Host kopieren:
 sudo install -d -m 700 /etc/bissinger-staging
 echo 'age1…' | sudo tee /etc/bissinger-staging/backup-recipients.txt
-sudo install -d -m 700 -o 70 -g 70 /srv/bissinger-staging/backups   # uid 70 = Backup-Container
+sudo install -d -m 700 -o 70 -g 70 /srv/bissinger-staging/backups   # uid 70 = Backup-Container; `validate` verlangt genau das
 
 # 2. Konfiguration
 infrastructure/scripts/staging.sh init https://bos-staging.<tailnet>.ts.net

@@ -22,24 +22,10 @@ staging.sh monitor     # Exit 0 = alles gut; sonst je Problem eine Zeile "ALERT 
 | Plattenbelegung `/` und Backup-Verzeichnis | ≥ 85 % (`MONITOR_MAX_DISK_PERCENT`) |
 | API-Fehler (`"level":"error"`) im Zeitfenster | > 20 in 15 min |
 
-**Alarmierung:** Ein systemd-Timer führt `monitor` alle 5 Minuten aus und meldet jede Ausgabe ungleich 0 weiter, z. B. an eine Mail- oder Chat-Adresse. Ein Beispiel liegt unten. Grafana, Prometheus oder Loki sind bewusst nicht nötig.
+**Alarmierung:** Der Timer `bos-monitor.timer` führt `monitor` alle 5 Minuten aus. Schlägt ein Lauf fehl, liefert `bos-alert@.service` die letzten `ALERT`-Zeilen über `infrastructure/scripts/alert.sh` an einen Webhook (z. B. ntfy, Slack/Mattermost/Teams). Units und Einrichtung: [`infrastructure/systemd/README.md`](../../infrastructure/systemd/README.md). Grafana, Prometheus oder Loki sind bewusst nicht nötig.
 
-```ini
-# /etc/systemd/system/bos-monitor.service
-[Service]
-Type=oneshot
-WorkingDirectory=/opt/bissinger-os
-ExecStart=/opt/bissinger-os/infrastructure/scripts/staging.sh monitor
-# Bei Fehler: Ausgabe an die IT schicken (Mailer/Webhook nach Wahl)
-ExecStopPost=/bin/sh -c '[ "$SERVICE_RESULT" = success ] || journalctl -u bos-monitor -n 20 --no-pager | mail -s "Bissinger OS Staging ALERT" it@bissinger-lights.de'
-
-# /etc/systemd/system/bos-monitor.timer
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=5min
-[Install]
-WantedBy=timers.target
-```
+- Zustellung beweisen: `staging.sh alert-test` (muss am Kanal ankommen) und einmal einen echten Ausfall auslösen (Abnahme M-3 in [staging-acceptance.md](staging-acceptance.md)).
+- Alarme wiederholen sich bei jedem fehlschlagenden Lauf; eine Entwarnung gibt es nicht.
 
 | Ereignis | Erkennung | Reaktion |
 |---|---|---|
@@ -67,6 +53,8 @@ docker compose --env-file infrastructure/docker/.env.staging -f infrastructure/d
 git fetch && git checkout <freigegebener Commit>
 staging.sh update
 ```
+
+Nach einem **fehlgeschlagenen** Update zuerst `staging.sh rollback`, erst dann erneut `update`. Ein zweites `update` direkt danach würde `:previous` mit dem fehlerhaften Stand überschreiben.
 
 `update` läuft so ab:
 
