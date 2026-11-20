@@ -7,7 +7,11 @@ import {
   InboundEmailStatus,
   Prisma,
 } from '../../../generated/prisma/client';
-import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
+import {
+  BackgroundJobsService,
+  JobLeaseLostError,
+  type JobContext,
+} from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiChatService } from '../ai/ai-chat.service';
 import { AiProposalsService } from '../ai/ai-proposals.service';
@@ -67,14 +71,18 @@ export class InboxService {
 
   @Cron('*/5 * * * *', { name: 'inbox-poll' })
   async pollScheduledJob() {
-    await this.jobs?.run('inbox-poll', () => this.pollScheduled());
+    await this.jobs?.run('inbox-poll', (context) =>
+      this.pollScheduled(context),
+    );
   }
 
-  async pollScheduled() {
+  async pollScheduled(context?: JobContext) {
     if (!this.isConfigured()) return;
     try {
-      await this.poll();
+      await this.poll(context);
     } catch (error) {
+      // A lost lease / shutdown ends the run without a misleading "failed" log.
+      if (error instanceof JobLeaseLostError) throw error;
       this.logger.error(
         `Posteingang konnte nicht abgerufen werden: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -82,7 +90,7 @@ export class InboxService {
   }
 
   /** Fetches unread mails from the configured IMAP inbox and ingests them. */
-  async poll() {
+  async poll(context?: JobContext) {
     if (!this.isConfigured()) {
       return { configured: false, imported: 0 };
     }
@@ -99,6 +107,10 @@ export class InboxService {
     });
 
     let imported = 0;
+    // Cooperative cancellation: closing the connection interrupts a pending
+    // IMAP command at once when the lease is lost or the process shuts down.
+    const closeOnAbort = () => client.close();
+    context?.signal.addEventListener('abort', closeOnAbort, { once: true });
     try {
       await client.connect();
       const lock = await client.getMailboxLock(
@@ -108,6 +120,9 @@ export class InboxService {
         const uids =
           (await client.search({ seen: false }, { uid: true })) || [];
         for (const uid of uids.slice(0, MAX_MESSAGES_PER_POLL)) {
+          // Every mail is idempotent (unique messageId); stopping between two
+          // mails is safe, the rest stays unseen for the next run.
+          context?.assertLeaseHeld();
           const message = await client.fetchOne(
             String(uid),
             { source: true },
@@ -134,6 +149,7 @@ export class InboxService {
       }
       await client.logout();
     } finally {
+      context?.signal.removeEventListener('abort', closeOnAbort);
       this.isPolling = false;
     }
     return { configured: true, imported };

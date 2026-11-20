@@ -157,7 +157,9 @@ describe('BackgroundJobsService', () => {
     const task = jest.fn().mockResolvedValue(undefined);
     await expect(service.run('session-purge', task)).resolves.toBe(true);
     expect(task).toHaveBeenCalledTimes(1);
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    // acquire + finish (no heartbeat fires within a fast job)
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(service.activeRunCount()).toBe(0);
   });
 
   it('skips a job whose lease another instance holds', async () => {
@@ -185,8 +187,77 @@ describe('BackgroundJobsService', () => {
         Promise.reject(new TypeError('secret detail')),
       ),
     ).resolves.toBe(true);
-    const [, status, error] = prisma.$executeRaw.mock.calls[0] as unknown[];
-    expect(status).toBe('failed');
-    expect(error).toBe('TypeError');
+    // second statement is the finish: (strings, name, runToken, status, error, ...)
+    const finish = prisma.$queryRaw.mock.calls[1] as unknown[];
+    expect(finish).toContain('failed');
+    expect(finish).toContain('TypeError');
+    expect(service.activeRunCount()).toBe(0);
+  });
+
+  describe('heartbeat (mocked database, fake timers)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+      process.env.BACKGROUND_JOBS = 'all';
+      process.env.BACKGROUND_JOB_HEARTBEAT_MS = '1000';
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+      delete process.env.BACKGROUND_JOB_HEARTBEAT_MS;
+    });
+
+    it('renews the lease on a timer and leaves no timer behind after the run', async () => {
+      const { service, prisma } = setup([]);
+      let release!: () => void;
+      const parked = new Promise<void>((resolve) => (release = resolve));
+      const running = service.run('session-purge', () => parked);
+      await jest.advanceTimersByTimeAsync(3100);
+      // acquire + 3 heartbeats so far
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(4);
+      release();
+      await running;
+      const calls = prisma.$queryRaw.mock.calls.length;
+      expect(jest.getTimerCount()).toBe(0);
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(prisma.$queryRaw.mock.calls.length).toBe(calls);
+    });
+
+    it('stops the job once the database cannot be reached for longer than the lease', async () => {
+      const { service, prisma } = setup([]);
+      let signal!: AbortSignal;
+      let release!: () => void;
+      const parked = new Promise<void>((resolve) => (release = resolve));
+      const running = service.run('session-purge', (ctx) => {
+        signal = ctx.signal;
+        return parked;
+      });
+      await jest.advanceTimersByTimeAsync(0);
+      // From now on every heartbeat fails (database down).
+      prisma.$queryRaw.mockRejectedValue(new Error('connection refused'));
+      await jest.advanceTimersByTimeAsync(60_000);
+      expect(signal.aborted).toBe(false); // still inside the lease (120 s)
+      await jest.advanceTimersByTimeAsync(61_000);
+      expect(signal.aborted).toBe(true); // lease could not be proven any longer
+      release();
+      await running;
+      expect(service.activeRunCount()).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('stops the job when the heartbeat is rejected (lease taken over)', async () => {
+      const { service, prisma } = setup([]);
+      let signal!: AbortSignal;
+      let release!: () => void;
+      const parked = new Promise<void>((resolve) => (release = resolve));
+      const running = service.run('session-purge', (ctx) => {
+        signal = ctx.signal;
+        return parked;
+      });
+      await jest.advanceTimersByTimeAsync(0);
+      prisma.$queryRaw.mockResolvedValue([]); // renewal matches no row
+      await jest.advanceTimersByTimeAsync(1100);
+      expect(signal.aborted).toBe(true);
+      release();
+      await running;
+    });
   });
 });

@@ -19,44 +19,53 @@ export interface JobDefinition {
   /** Talks to systems outside this deployment (IMAP, AI provider, e-mail). */
   external: boolean;
   description: string;
-  /** Upper bound of one run; the cluster-wide lease expires after it. */
+  /**
+   * Lease time-to-live. NOT an upper bound of a run: a running job renews its
+   * lease by heartbeat. The TTL is how long a crashed or frozen instance keeps
+   * the job blocked before another instance may take over.
+   */
   leaseSeconds: number;
 }
+
+/** How often a running job extends its lease (must stay well below the TTL). */
+export const HEARTBEAT_INTERVAL_MS = 30_000;
+/** How long shutdown waits for running jobs to stop cooperatively. */
+export const SHUTDOWN_GRACE_MS = 10_000;
 
 export const BACKGROUND_JOBS = {
   'session-purge': {
     kind: 'maintenance',
     external: false,
     description: 'Deletes sessions that ended more than 24 h ago (hourly).',
-    leaseSeconds: 10 * 60,
+    leaseSeconds: 120,
   },
   'calendar-reminders': {
     kind: 'business',
     external: true,
     description:
       'Sends due calendar reminders as notifications/e-mail (every minute).',
-    leaseSeconds: 5 * 60,
+    leaseSeconds: 120,
   },
   'inbox-poll': {
     kind: 'business',
     external: true,
     description:
       'Fetches unread mails via IMAP and classifies them with AI (every 5 minutes).',
-    leaseSeconds: 15 * 60,
+    leaseSeconds: 120,
   },
   'ai-agents': {
     kind: 'business',
     external: true,
     description:
       'Creates AI proposals for overdue invoices, open quotes, stock (daily 06:00).',
-    leaseSeconds: 60 * 60,
+    leaseSeconds: 120,
   },
   'recurring-invoices': {
     kind: 'business',
     external: false,
     description:
       'Creates invoice drafts from recurring invoice templates (daily 05:00).',
-    leaseSeconds: 60 * 60,
+    leaseSeconds: 120,
   },
 } as const satisfies Record<string, JobDefinition>;
 

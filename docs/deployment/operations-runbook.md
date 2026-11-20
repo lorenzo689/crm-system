@@ -105,7 +105,13 @@ Prisma kennt kein automatisches „down“. Eine fehlgeschlagene Migration marki
 
 ## Mehrere API-Instanzen
 
-Die Hintergrundjobs sind über Leases in `background_job_runs` abgesichert: Jeder Lauf ist clusterweit exklusiv, und eine abgestürzte Instanz gibt ihre Lease nach `leaseSeconds` frei.
+Die Hintergrundjobs sind über Leases in `background_job_runs` abgesichert: Jeder Lauf ist clusterweit exklusiv. Ein laufender Job verlängert seine Lease per Heartbeat (alle 30 s, Lease-TTL 120 s). Eine abgestürzte oder eingefrorene Instanz sendet keinen Heartbeat mehr; nach spätestens 120 s übernimmt eine andere Instanz. Die alte Instanz bricht beim nächsten Heartbeat ab (`signal`), sobald ihre Lease weg ist.
+
+- **Geordnetes Beenden:** Beim Herunterfahren (`SIGTERM`) werden laufende Jobs abgebrochen und bis zu 10 s abgewartet. Ihre Lease wird mit Status `interrupted` freigegeben, eine andere Instanz kann sofort weitermachen. Der `stop_grace_period` der API muss über 10 s liegen (Staging: 20 s).
+- **Monitoring (Logzeilen `job=<name> status=…`):** `took-over` (Lease einer toten Instanz übernommen, mit `fence`), `lease-lost` (laufender Job hat seine Lease verloren und stoppt), `heartbeat-failed` (Datenbank nicht erreichbar, der Job läuft bis zum Ablauf der lokalen Lease weiter), `interrupted` (Shutdown). Ein dauerhaftes `lease-lost` deutet auf zu lange Pausen der Instanz (z. B. CPU-Starvation, GC) hin.
+- **Nicht exactly-once:** Nach einer Übernahme kann ein Job erneut laufen. Doppelte Wirkungen verhindern Idempotenzschlüssel in der Datenbank (wiederkehrende Rechnung: eindeutig je Vorlage und Fälligkeitsdatum; Erinnerung: Markierung und Benachrichtigung in einer Transaktion; Posteingang: eindeutige `messageId`; KI-Vorschläge: eindeutiger `dedupeKey`). Siehe `docs/security/sprint-3-1-hardening.md`.
+- **Testhilfe:** `BACKGROUND_JOB_HEARTBEAT_MS` überschreibt das Heartbeat-Intervall; nur für Tests, nicht in Produktion setzen.
+- **Reverse Proxy:** Der Header `X-Session-Context` aller API-Antworten muss unverändert beim Browser ankommen. Fehlt er, blockiert die Web-App aus Sicherheitsgründen (Seite bleibt leer). `infrastructure/tests/staging-smoke.sh` prüft das.
 
 Nicht verteilt sind:
 

@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
+import {
+  BackgroundJobsService,
+  JobLeaseLostError,
+  type JobContext,
+} from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiProposalsService } from './ai-proposals.service';
 
@@ -35,19 +39,23 @@ export class AiAgentsService {
 
   @Cron('0 6 * * *', { name: 'ai-agents' })
   async runScheduledJob() {
-    await this.jobs?.run('ai-agents', () => this.runScheduled());
+    await this.jobs?.run('ai-agents', (context) => this.runScheduled(context));
   }
 
-  async runScheduled() {
+  async runScheduled(context?: JobContext) {
     const organizations = await this.prisma.organization.findMany({
       where: { archivedAt: null },
       select: { id: true },
     });
     for (const { id } of organizations) {
+      // Proposals are idempotent (unique dedupeKey), so stopping between two
+      // organizations is safe; the next run continues.
+      context?.assertLeaseHeld();
       try {
         const created = await this.runForOrganization(id);
         this.logger.log(`Agent run for ${id}: ${created} new proposals`);
       } catch (error) {
+        if (error instanceof JobLeaseLostError) throw error;
         this.logger.error(
           `Agent run failed for ${id}: ${error instanceof Error ? error.message : String(error)}`,
         );

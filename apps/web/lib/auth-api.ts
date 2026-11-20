@@ -79,7 +79,7 @@ function sendWithSession(
   init: RequestInit | undefined,
 ): Promise<Response> {
   const method = (init?.method ?? "GET").toUpperCase();
-  return sendAsCurrentIdentity(method, (csrfToken) => {
+  return sendAsCurrentIdentity(method, (csrfToken, contextSignal) => {
     const headers = new Headers(init?.headers);
     if (init?.body && !isRawBody(init.body) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
@@ -87,10 +87,15 @@ function sendWithSession(
     if (csrfToken) {
       headers.set("X-CSRF-Token", csrfToken);
     }
+    // Safe requests are aborted when the page's session context changes.
+    const signals = [init?.signal, contextSignal].filter(
+      (signal): signal is AbortSignal => Boolean(signal),
+    );
     return fetch(`${API_URL}${path}`, {
       ...init,
       headers,
       credentials: "include",
+      signal: signals.length > 1 ? AbortSignal.any(signals) : signals[0],
     });
   });
 }

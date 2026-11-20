@@ -56,6 +56,16 @@ cookie_ok() {
 check "session cookie is __Host-, Secure, HttpOnly, SameSite=Lax, Path=/, no Domain" cookie_ok
 check "session probe 200" bash -c "[ \"\$1\" = 200 ]" _ "$(authed "$DIR" -o /dev/null -w '%{http_code}' "${API}/auth/session")"
 
+# Sprint 3.1: the browser binds every answer to its session context via this
+# header. A proxy that strips it would make the web app fail closed, so the
+# gateway must pass it through, and it must equal `contextId` of the body.
+session_headers="$(mktemp)"
+session_body="$(authed "$DIR" -D "$session_headers" "${API}/auth/session")"
+context_header="$(grep -i '^x-session-context:' "$session_headers" | head -1 | cut -d: -f2- | tr -d ' \r\n')"
+context_body="$(printf '%s' "$session_body" | json_get contextId)"
+rm -f "$session_headers"
+check "X-Session-Context reaches the client and equals contextId" bash -c '[ -n "$1" ] && [ "$1" = "$2" ]' _ "$context_header" "$context_body"
+
 echo "== CSRF and origin checks (Sprint 2) behind the proxy"
 code_without_token="$(https "$DIR" -o /dev/null -w '%{http_code}' -H "Cookie: ${COOKIE}" -H "Origin: ${ORIGIN}" -H 'Content-Type: application/json' -d '{"name":"X","customerNumber":"K-1"}' "${API}/customers")"
 check "mutation without CSRF token -> 403" [ "$code_without_token" = 403 ]

@@ -3,6 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
 import { json } from 'express';
 import helmet from 'helmet';
+import { SESSION_CONTEXT_HEADER } from './modules/auth/session-context';
 import {
   createOriginGuardMiddleware,
   getAllowedOrigins,
@@ -50,6 +51,8 @@ export function configureApp(app: NestExpressApplication) {
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', CSRF_HEADER],
+    // Lets the dev frontend (other origin) read the non-secret context marker.
+    exposedHeaders: [SESSION_CONTEXT_HEADER, 'Content-Disposition'],
     maxAge: 600,
   });
   app.useGlobalFilters(new RequestIdExceptionFilter(app.getHttpAdapter()));

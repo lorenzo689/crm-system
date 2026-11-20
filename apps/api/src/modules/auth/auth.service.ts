@@ -12,6 +12,7 @@ import { ACCOUNT_STATE_SELECT, getUsableMembership } from './account-status';
 import { AuthMailService } from './auth-mail.service';
 import { JWT_ALGORITHMS } from './auth-config';
 import { CsrfTokenException, csrfTokenFor, isValidCsrfToken } from './csrf';
+import { sessionContextFor } from './session-context';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -85,6 +86,7 @@ export class AuthService {
         issued.sessionId,
         issued.expiresAt,
         membership?.role,
+        membership?.organizationId,
       ),
     };
   }
@@ -96,6 +98,7 @@ export class AuthService {
       authUser.sessionId,
       authUser.sessionExpiresAt,
       authUser.role,
+      authUser.organizationId,
     );
   }
 
@@ -144,6 +147,7 @@ export class AuthService {
     sessionId: string,
     expiresAt: Date,
     role: string | undefined,
+    organizationId: string | undefined,
   ) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -168,6 +172,13 @@ export class AuthService {
       organization,
       role: role ?? null,
       csrfToken: csrfTokenFor(sessionId),
+      // Same value the guard puts into X-Session-Context for this session.
+      contextId: sessionContextFor({
+        sessionId,
+        userId: user.id,
+        organizationId: organizationId ?? '',
+        role: role ?? '',
+      }),
       expiresAt: expiresAt.toISOString(),
     };
   }

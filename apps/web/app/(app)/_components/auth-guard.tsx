@@ -1,10 +1,46 @@
 "use client";
 
-import { SESSION_CHANGED_MESSAGE } from "@/lib/session";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { advanceContentKey, type ContentKey } from "@/lib/context-key";
+import { captureDrafts, type Draft } from "@/lib/draft-capture";
+import {
+  getContextEpoch,
+  getSessionSnapshot,
+  subscribeContext,
+} from "@/lib/session";
 import { useAuthGuard } from "@/lib/use-auth-guard";
+import { GuardedContent } from "./guard-view";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { state, retry } = useAuthGuard();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const blocked = state.status === "authenticated" && state.identityChanged;
+
+  // New session or role of the SAME person: every component under the guard is
+  // rebuilt, so data loaded under the old context cannot stay on screen (many
+  // pages keep their own API state). Typed-in drafts are captured first.
+  const epoch = useSyncExternalStore(subscribeContext, getContextEpoch, () => 0);
+  const [content, setContent] = useState<ContentKey>({ epoch, key: 0 });
+  const next = advanceContentKey(content, epoch, blocked);
+  if (next !== content) setContent(next);
+  const [refreshed, setRefreshed] = useState<Draft[] | null>(null);
+
+  useEffect(
+    () =>
+      subscribeContext(() => {
+        const current = getSessionSnapshot();
+        if (current.status !== "authenticated") return;
+        if (current.identityChanged) {
+          // Another person/organization: nothing of the old context is kept.
+          setRefreshed(null);
+          return;
+        }
+        if (contentRef.current) {
+          setRefreshed(captureDrafts(contentRef.current));
+        }
+      }),
+    [],
+  );
 
   if (state.status === "error") {
     return (
@@ -30,31 +66,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <>
-      {state.identityChanged && <SessionChangedBanner />}
-      {children}
-    </>
-  );
-}
-
-/**
- * Shown when the browser's session now belongs to someone else. The page and
- * its unsaved input stay; every request is blocked until the user reloads.
- */
-function SessionChangedBanner() {
-  return (
-    <div
-      role="alert"
-      className="fixed inset-x-0 top-0 z-[100] flex flex-wrap items-center justify-center gap-3 border-b border-[#f0d9a8] bg-[#fff7e8] px-4 py-3 text-sm text-[#805b10] shadow-sm"
+    <GuardedContent
+      blocked={blocked}
+      contentKey={content.key}
+      contentRef={contentRef}
+      refreshed={refreshed}
+      onCloseRefreshed={() => setRefreshed(null)}
     >
-      <span>{SESSION_CHANGED_MESSAGE}</span>
-      <button
-        type="button"
-        onClick={() => window.location.reload()}
-        className="rounded-lg border border-[#e0c48a] bg-white px-3 py-1.5 text-sm font-medium text-[#805b10] hover:bg-[#fff1d6]"
-      >
-        Seite neu laden
-      </button>
-    </div>
+      {children}
+    </GuardedContent>
   );
 }

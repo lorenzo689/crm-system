@@ -365,6 +365,11 @@ model BackgroundJobRun {
   name                String    @id
   lockedUntil         DateTime?
   lockedBy            String?
+  /// Random per run; only the holder of this token may renew or finish the lease.
+  runToken            String?
+  /// Incremented on every acquisition (fencing counter, visible in logs).
+  fence               Int       @default(0)
+  lastHeartbeatAt     DateTime?
   lastStartedAt       DateTime?
   lastFinishedAt      DateTime?
   lastSucceededAt     DateTime?
@@ -820,44 +825,49 @@ model NumberSequence {
 }
 
 model SalesDocument {
-  id                String              @id @default(uuid()) @db.Uuid
-  organizationId    String              @db.Uuid
-  type              SalesDocumentType
-  number            String
-  status            SalesDocumentStatus @default(DRAFT)
-  customerId        String              @db.Uuid
-  projectId         String?             @db.Uuid
-  sourceQuoteId     String?             @db.Uuid
-  creditedInvoiceId String?             @db.Uuid
-  creditedCents     Int                 @default(0)
-  issueDate         DateTime            @db.Date
-  dueDate           DateTime?           @db.Date
-  headerText        String?
-  footerText        String?
-  netCents          Int                 @default(0)
-  vatCents          Int                 @default(0)
-  grossCents        Int                 @default(0)
-  createdById       String?             @db.Uuid
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  paidAt            DateTime?
-  paidCents         Int                 @default(0)
-  dunningLevel      Int                 @default(0)
-  lastDunnedAt      DateTime?
-  payments          Payment[]
-  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  project           Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  sourceQuote       SalesDocument?      @relation("QuoteToInvoice", fields: [sourceQuoteId], references: [id], onDelete: Restrict)
-  invoices          SalesDocument[]     @relation("QuoteToInvoice")
-  creditedInvoice   SalesDocument?      @relation("InvoiceCredits", fields: [creditedInvoiceId], references: [id], onDelete: Restrict)
-  creditNotes       SalesDocument[]     @relation("InvoiceCredits")
-  timeEntries       TimeEntry[]
-  bankTransactions  BankTransaction[]
-  createdBy         User?               @relation("SalesDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  items             SalesDocumentItem[]
+  id                 String              @id @default(uuid()) @db.Uuid
+  organizationId     String              @db.Uuid
+  type               SalesDocumentType
+  number             String
+  status             SalesDocumentStatus @default(DRAFT)
+  customerId         String              @db.Uuid
+  projectId          String?             @db.Uuid
+  sourceQuoteId      String?             @db.Uuid
+  creditedInvoiceId  String?             @db.Uuid
+  /// Set when a recurring template created this document (idempotency key with recurrenceDate).
+  recurringInvoiceId String?             @db.Uuid
+  recurrenceDate     DateTime?           @db.Date
+  creditedCents      Int                 @default(0)
+  issueDate          DateTime            @db.Date
+  dueDate            DateTime?           @db.Date
+  headerText         String?
+  footerText         String?
+  netCents           Int                 @default(0)
+  vatCents           Int                 @default(0)
+  grossCents         Int                 @default(0)
+  createdById        String?             @db.Uuid
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  paidAt             DateTime?
+  paidCents          Int                 @default(0)
+  dunningLevel       Int                 @default(0)
+  lastDunnedAt       DateTime?
+  payments           Payment[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project            Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  sourceQuote        SalesDocument?      @relation("QuoteToInvoice", fields: [sourceQuoteId], references: [id], onDelete: Restrict)
+  invoices           SalesDocument[]     @relation("QuoteToInvoice")
+  creditedInvoice    SalesDocument?      @relation("InvoiceCredits", fields: [creditedInvoiceId], references: [id], onDelete: Restrict)
+  creditNotes        SalesDocument[]     @relation("InvoiceCredits")
+  recurringInvoice   RecurringInvoice?   @relation(fields: [recurringInvoiceId], references: [id], onDelete: SetNull)
+  timeEntries        TimeEntry[]
+  bankTransactions   BankTransaction[]
+  createdBy          User?               @relation("SalesDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items              SalesDocumentItem[]
 
   @@unique([organizationId, number])
+  @@unique([recurringInvoiceId, recurrenceDate])
   @@index([organizationId, type, status])
   @@index([organizationId, type, issueDate])
   @@index([customerId])
@@ -1136,22 +1146,23 @@ model TimeEntry {
 }
 
 model RecurringInvoice {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  customerId     String       @db.Uuid
-  projectId      String?      @db.Uuid
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  customerId     String          @db.Uuid
+  projectId      String?         @db.Uuid
   title          String
   intervalMonths Int
-  nextRunDate    DateTime     @db.Date
-  active         Boolean      @default(true)
+  nextRunDate    DateTime        @db.Date
+  active         Boolean         @default(true)
   headerText     String?
   footerText     String?
   items          Json
   lastRunAt      DateTime?
-  createdAt      DateTime     @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  documents      SalesDocument[]
 
   @@index([organizationId, active, nextRunDate])
   @@map("recurring_invoices")

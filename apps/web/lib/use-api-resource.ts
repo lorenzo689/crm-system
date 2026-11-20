@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import {
+  SessionChangedError,
+  getContextEpoch,
+  subscribeContext,
+} from "@/lib/session";
 
 type Result<T> = { key: string; data: T | null; error: string | null };
 
@@ -17,7 +22,15 @@ type Result<T> = { key: string; data: T | null; error: string | null };
 export function useApiResource<T>(path: string | null, fallbackError: string) {
   const [version, setVersion] = useState(0);
   const [result, setResult] = useState<Result<T> | null>(null);
-  const key = path === null ? null : `${version}:${path}`;
+  // A result belongs to the session context it was loaded in: when the
+  // context changes the key changes, the old result is no longer "current"
+  // and the data is loaded again for the new context.
+  const contextEpoch = useSyncExternalStore(
+    subscribeContext,
+    getContextEpoch,
+    () => 0,
+  );
+  const key = path === null ? null : `${contextEpoch}:${version}:${path}`;
 
   useEffect(() => {
     if (key === null || path === null) {
@@ -29,6 +42,8 @@ export function useApiResource<T>(path: string | null, fallbackError: string) {
         if (active) setResult({ key, data, error: null });
       })
       .catch((caught: unknown) => {
+        // Session change: the blocking notice explains it; no data, no error.
+        if (caught instanceof SessionChangedError) return;
         if (active) {
           setResult({
             key,

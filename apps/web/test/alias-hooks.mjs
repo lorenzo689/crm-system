@@ -30,3 +30,22 @@ export async function resolve(specifier, context, nextResolve) {
   }
   return nextResolve(specifier, context);
 }
+
+// Test-only: lets Node run the .tsx view components (JSX) by transpiling them
+// with the TypeScript compiler that is already a dev dependency.
+export async function load(url, context, nextLoad) {
+  if (!url.endsWith(".tsx")) return nextLoad(url, context);
+  const [{ default: ts }, { readFile }] = await Promise.all([
+    import("typescript"),
+    import("node:fs/promises"),
+  ]);
+  const source = await readFile(fileURLToPath(url), "utf8");
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: {
+      jsx: ts.JsxEmit.ReactJSX,
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  });
+  return { format: "module", source: outputText, shortCircuit: true };
+}
