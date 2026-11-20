@@ -302,6 +302,46 @@ function discard(response: Response) {
   void response.body?.cancel().catch(() => undefined);
 }
 
+/**
+ * The header check only proves who the answer was produced for when its
+ * headers arrived. The body can still be on its way (JSON, files, streamed AI
+ * answers) while the context changes. The returned response therefore reads
+ * its body through a guard: before every chunk is handed on, and once more at
+ * the end, the context epoch must be unchanged; otherwise the stream is
+ * cancelled and fails with SessionChangedError, so neither json()/blob()/text()
+ * nor a stream reader can deliver data of the old context.
+ */
+function bindBodyToContext(response: Response, startedIn: number): Response {
+  if (!response.body) return response;
+  const reader = response.body.getReader();
+  const guarded = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const chunk = await reader.read();
+        if (epoch !== startedIn) throw new SessionChangedError();
+        if (chunk.done) {
+          controller.close();
+        } else {
+          controller.enqueue(chunk.value);
+        }
+      } catch (error) {
+        const failure =
+          epoch !== startedIn ? new SessionChangedError() : error;
+        void reader.cancel().catch(() => undefined);
+        controller.error(failure);
+      }
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
+    },
+  });
+  return new Response(guarded, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 /** Still signed in as the same, unblocked person: asking again is allowed. */
 function mayRetryInNewContext() {
   return canRequestData() && state.status === "authenticated";
@@ -342,7 +382,7 @@ async function sendBoundToContext(send: Sender): Promise<Response> {
     }
     const actual = response.headers.get(SESSION_CONTEXT_HEADER);
     if (actual === expected) {
-      return response;
+      return bindBodyToContext(response, startedIn);
     }
     // Error answers without any marker carry no data of another context.
     if (actual === null && !response.ok && response.status !== 401) {
@@ -398,9 +438,10 @@ export async function sendAsCurrentIdentity(
 
   const csrfToken = await getCsrfToken();
   const issuedAs = currentIdentity();
+  const sentIn = epoch;
   const response = await send(csrfToken, undefined);
   if (!(await isCsrfRejection(response))) {
-    return response;
+    return guardStream(response, sentIn);
   }
 
   const fresh = await loadSession({ force: true }).catch(() => null);
@@ -416,7 +457,21 @@ export async function sendAsCurrentIdentity(
   assertIdentityUnchanged();
   // Same user and organization, new session (e.g. a re-login in another tab):
   // one retry with that session's token; a second rejection is final.
-  return send(fresh.csrfToken, undefined);
+  const retriedIn = epoch;
+  return guardStream(await send(fresh.csrfToken, undefined), retriedIn);
+}
+
+/**
+ * A mutation's answer is a record of what already happened and is delivered
+ * as is. A STREAMED answer (the assistant's text/event-stream) goes on for a
+ * long time, so it follows the same rule as reads: it stops with
+ * SessionChangedError as soon as the page's session context changes.
+ */
+function guardStream(response: Response, startedIn: number): Response {
+  const type = response.headers.get("Content-Type") ?? "";
+  return type.toLowerCase().includes("text/event-stream")
+    ? bindBodyToContext(response, startedIn)
+    : response;
 }
 
 /** Called with the login response body (which carries no credential). */

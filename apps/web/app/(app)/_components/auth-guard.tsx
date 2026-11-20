@@ -1,8 +1,21 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { advanceContentKey, type ContentKey } from "@/lib/context-key";
 import { captureDrafts, type Draft } from "@/lib/draft-capture";
-import { SESSION_CHANGED_MESSAGE } from "@/lib/session";
+import {
+  SESSION_CHANGED_MESSAGE,
+  getContextEpoch,
+  getSessionSnapshot,
+  subscribeContext,
+} from "@/lib/session";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -10,6 +23,27 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const blocked = state.status === "authenticated" && state.identityChanged;
+
+  // New session or role of the SAME person: every component under the guard is
+  // rebuilt, so data loaded under the old context cannot stay on screen (many
+  // pages keep their own API state). Typed-in drafts are captured first.
+  const epoch = useSyncExternalStore(subscribeContext, getContextEpoch, () => 0);
+  const [content, setContent] = useState<ContentKey>({ epoch, key: 0 });
+  const next = advanceContentKey(content, epoch, blocked);
+  if (next !== content) setContent(next);
+  const [refreshed, setRefreshed] = useState<Draft[] | null>(null);
+
+  useEffect(
+    () =>
+      subscribeContext(() => {
+        const current = getSessionSnapshot();
+        if (current.status !== "authenticated" || current.identityChanged) return;
+        if (contentRef.current) {
+          setRefreshed(captureDrafts(contentRef.current));
+        }
+      }),
+    [],
+  );
 
   // Runs right after the page was switched to "blocked" and before it is
   // painted hidden: the DOM still holds what the user typed.
@@ -56,8 +90,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         inert={blocked}
         aria-hidden={blocked}
       >
-        {children}
+        <Fragment key={content.key}>{children}</Fragment>
       </div>
+      {refreshed && !blocked && (
+        <RefreshedNotice drafts={refreshed} onClose={() => setRefreshed(null)} />
+      )}
       {blocked && <SessionChangedNotice drafts={drafts} />}
     </>
   );
@@ -72,13 +109,7 @@ function SessionChangedNotice({ drafts }: { drafts: Draft[] }) {
   const [copied, setCopied] = useState(false);
 
   async function copyDrafts() {
-    const text = drafts.map((d) => `${d.label}:\n${d.value}`).join("\n\n");
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
+    setCopied(await copyDraftsToClipboard(drafts));
   }
 
   return (
@@ -99,19 +130,14 @@ function SessionChangedNotice({ drafts }: { drafts: Draft[] }) {
         </p>
         {drafts.length > 0 && (
           <div className="mt-3 rounded-lg border border-[#e0c48a] bg-white p-3">
-            <p className="mb-2 font-medium">
+            <p className="mb-1 font-medium">
               Nicht gespeicherte Eingaben ({drafts.length})
             </p>
-            <ul className="max-h-32 space-y-1 overflow-auto text-xs">
-              {drafts.map((draft, index) => (
-                <li key={index} className="break-words">
-                  <span className="font-medium">{draft.label}:</span>{" "}
-                  {draft.value.length > 200
-                    ? `${draft.value.slice(0, 200)} …`
-                    : draft.value}
-                </li>
-              ))}
-            </ul>
+            <p className="text-xs">
+              Der Inhalt wird hier nicht angezeigt, weil an diesem Gerät
+              inzwischen jemand anderes angemeldet sein kann. Mit dem Button
+              kopierst du ihn, wenn du es selbst bist.
+            </p>
             <button
               type="button"
               onClick={() => void copyDrafts()}
@@ -140,6 +166,59 @@ function SessionChangedNotice({ drafts }: { drafts: Draft[] }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+async function copyDraftsToClipboard(drafts: Draft[]) {
+  const text = drafts.map((d) => `${d.label}:\n${d.value}`).join("\n\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Same person, new session or role: the page was rebuilt with fresh data. If
+ * something had been typed, it can still be copied (never shown).
+ */
+function RefreshedNotice({
+  drafts,
+  onClose,
+}: {
+  drafts: Draft[];
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div
+      role="status"
+      className="fixed inset-x-0 top-0 z-[100] flex flex-wrap items-center justify-center gap-3 border-b border-[#f0d9a8] bg-[#fff7e8] px-4 py-3 text-sm text-[#805b10] shadow-sm"
+    >
+      <span>
+        Deine Sitzung oder Berechtigung hat sich geändert; die Seite wurde mit
+        aktuellen Daten neu aufgebaut.
+        {drafts.length > 0 &&
+          ` ${drafts.length} nicht gespeicherte Eingabe(n) wurden verworfen.`}
+      </span>
+      {drafts.length > 0 && (
+        <button
+          type="button"
+          onClick={() => void copyDraftsToClipboard(drafts).then(setCopied)}
+          className="rounded-lg border border-[#e0c48a] bg-white px-3 py-1.5 text-sm font-medium hover:bg-[#fff1d6]"
+        >
+          {copied ? "Kopiert" : "Eingaben kopieren"}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-lg border border-[#e0c48a] bg-white px-3 py-1.5 text-sm font-medium hover:bg-[#fff1d6]"
+      >
+        Schließen
+      </button>
     </div>
   );
 }

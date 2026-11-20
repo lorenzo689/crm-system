@@ -374,4 +374,88 @@ describe("document downloads and previews", () => {
       assert.equal(documents.isPreviewableType(risky), false, risky);
     }
   });
+
+});
+
+describe("the check does not end with the response headers", () => {
+  it("20. headers arrive under OWNER, the body is pending, the role changes: the old answer is not delivered", async () => {
+    signIn(ALICE);
+    const body = api.holdBody("/customers");
+    const outcome = getCustomers().then(
+      (value) => ({ delivered: value }),
+      (error: unknown) => ({ error }),
+    );
+    await body.reached; // headers were received, the body is still pending
+
+    api.cookie = ALICE_AS_MEMBER;
+    await session.loadSession({ force: true }); // same person, new role
+    body.release();
+
+    const result = await outcome;
+    assert.ok("error" in result, "the OWNER-era body must not be returned as a result");
+    assert.ok(result.error instanceof session.SessionChangedError);
+  });
+
+  it("21. the same for the cache: the old body is not stored", async () => {
+    signIn(ALICE);
+    const body = api.holdBody("/customers");
+    const loading = cache.loadApi("/customers");
+    await body.reached;
+
+    api.cookie = ALICE_AS_MEMBER;
+    await session.loadSession({ force: true });
+    body.release();
+    await loading;
+    await settle();
+
+    const stored = cache.peekApi("/customers")?.data as Customers | undefined;
+    assert.notEqual(stored?.role, "OWNER");
+  });
+
+  it("22. a stream (assistant chat) stops when the context changes between two chunks", async () => {
+    signIn(ALICE);
+    const rest = api.holdBody("/ai/chat/stream", { streamed: true });
+    // The assistant sends the question as POST and reads a text/event-stream.
+    const response = await client.apiFetchRaw("/ai/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ messages: [] }),
+    });
+    const reader = response.body!.getReader();
+    const first = await reader.read();
+    assert.equal(new TextDecoder().decode(first.value), "first-chunk;");
+    const next = reader.read().then(
+      (chunk) => ({ chunk }),
+      (error: unknown) => ({ error }),
+    );
+    await rest.reached;
+
+    api.cookie = ALICE_AS_MEMBER;
+    await session.loadSession({ force: true });
+    rest.release();
+
+    const result = await next;
+    assert.ok("error" in result, "no chunk of the old context after the change");
+    assert.ok(result.error instanceof session.SessionChangedError);
+  });
+
+  it("23. an unchanged context still delivers the complete body", async () => {
+    signIn(ALICE);
+    const body = api.holdBody("/customers");
+    const pending = getCustomers();
+    await body.reached;
+    body.release();
+    assert.equal((await pending).secret, "data-of-alice");
+  });
+});
+
+describe("rebuilding the page after a context change", () => {
+  it("24. a new session or role of the same person rebuilds the content once; a blocked page is left untouched", async () => {
+    const { advanceContentKey } = await import("@/lib/context-key");
+    const start = { epoch: 3, key: 0 };
+    assert.equal(advanceContentKey(start, 3, false), start, "same epoch: nothing changes");
+    const rebuilt = advanceContentKey(start, 4, false);
+    assert.deepEqual(rebuilt, { epoch: 4, key: 1 }, "new context: new key");
+    assert.equal(advanceContentKey(rebuilt, 4, false), rebuilt, "and only once");
+    assert.equal(advanceContentKey(rebuilt, 5, true), rebuilt, "blocked: content (and typed input) stays");
+  });
 });

@@ -74,7 +74,7 @@ Entscheidung **Marker statt Cookie-Auswertung**: Der Browser kann das HttpOnly-C
 
 | Bereich | Datei | Anzahl | Vorher → nachher |
 |---|---|---|---|
-| Frontend: Kontextbindung, Revalidierung, Cache, Dokumente | `apps/web/test/session-context.test.ts` (+ `fake-api.ts`) | 23 | 16 von 19 fehlgeschlagen (Test 16–19 neu) → alle bestanden |
+| Frontend: Kontextbindung, Revalidierung, Cache, Dokumente | `apps/web/test/session-context.test.ts` (+ `fake-api.ts`) | 28 | 16 von 19 fehlgeschlagen (Test 16–19 neu) → alle bestanden |
 | Frontend (bestehend, an Marker angepasst) | `apps/web/test/session-switch.test.ts` | 20 | bestanden |
 | Backend: Marker | `apps/api/test/session-context.e2e-spec.ts` | 6 | neu, bestanden |
 | Backend: Lease mit zwei Instanzen auf PostgreSQL | `apps/api/test/jobs-lease.e2e-spec.ts` | 8 | Vorher-Nachweis siehe 1.2 → bestanden |
@@ -127,3 +127,15 @@ Absichtlich **nicht** geändert: Login-Rate-Limit je Instanz (bekannt, Runbook),
 3. `background-jobs.service.ts`: Rennen zwischen `beat`, `finish` und `abort`; Bedingung `WHERE runToken`; `FOR SHARE` gegen `UPDATE`-Heartbeat (Wartezeit bis zum Ende der kurzen Transaktion).
 4. Migrationen `20261204120000` und `20261204130000` auf Rückwärtskompatibilität (nur additive Spalten, Fremdschlüssel `ON DELETE SET NULL`); `prisma migrate diff` zeigt keine Abweichung.
 5. Nach dem Deployment in Staging: `SIGTERM` an die API während eines laufenden Jobs, Logzeilen `interrupted` / `took-over` kontrollieren (F-05).
+
+## 10. Nacharbeit nach dem unabhängigen Review von PR #5
+
+Zwei Punkte, beide zuerst per Test reproduziert (Tests 20 und 22 schlugen vor der Änderung fehl).
+
+**10.1 Komponentenzustand nach Kontextwechsel.** Viele Seiten halten ihre Daten in eigenem `useState` (z. B. Dashboard, Verkaufsbeleg, Dokumentvorschau) und bekamen vom Cache-Schutz nichts mit. Zentrale Lösung in `AuthGuard`: Wechselt der Kontext derselben Person (neue Sitzung, neue Rolle), wird der gesamte Inhalt unter dem Guard neu aufgebaut (`key` pro Epoche, `lib/context-key.ts`). Dadurch verschwindet jeder Zustand der alten Rolle, auch offene Dialoge und Vorschauen (Blob-URLs werden beim Abbau freigegeben). Eine gesperrte Seite (andere Person) wird bewusst **nicht** neu aufgebaut. Vor dem Neuaufbau werden getippte Eingaben erfasst; ein Hinweis bietet „Eingaben kopieren“ an. Nicht gespeicherte Eingaben gehen beim Neuaufbau verloren, das ist der Preis der Garantie „keine Daten der alten Rolle“.
+
+**Draft-Anzeige:** Der Sperrdialog zeigt Eingaben **nicht mehr im Klartext**, nur die Anzahl; Kopieren ist eine ausdrückliche Handlung. Grund: Nach einem Benutzerwechsel kann am Gerät jemand anderes sitzen. Sonst wären Eingaben der vorherigen Person offengelegt worden.
+
+**10.2 Prüfung nur bei den Headern.** Die Kontextprüfung galt beim Eintreffen der Antwort-Header; der Body (JSON, Dateien, Streams) konnte danach noch unter dem alten Kontext ankommen. `sendBoundToContext` liefert jetzt eine Antwort, deren Body-Stream vor jedem Chunk und am Ende die Epoche prüft und sonst mit `SessionChangedError` abbricht (wirkt für `json()`, `blob()`, `text()` und Reader). Auch der KI-Chat (`POST /ai/chat/stream`, `text/event-stream`) ist so abgesichert; andere Mutationsantworten bleiben unverändert (sie beschreiben, was bereits geschehen ist).
+
+Grenzen: Der Neuaufbau und die Dialoge sind ohne DOM im Testlauf nicht automatisch testbar; getestet ist die Entscheidungslogik (`advanceContentKey`, Test 24). Serverseitig laufende Streams (Chat) werden bei Wechsel nicht abgebrochen, nur der Client hört auf zu lesen.

@@ -98,6 +98,56 @@ export class FakeApi {
     this.holds = [];
   }
 
+  private bodyHolds: {
+    path: string;
+    streamed: boolean;
+    reachedResolve: () => void;
+    released: Promise<void>;
+  }[] = [];
+
+  /**
+   * Holds the BODY of the next matching answer: the headers are delivered, the
+   * body stays pending until the gate is released. With `streamed` the first
+   * chunk is delivered at once and only the rest waits.
+   */
+  holdBody(path: string, options: { streamed?: boolean } = {}): Gate {
+    let reachedResolve!: () => void;
+    let release!: () => void;
+    const reached = new Promise<void>((resolve) => (reachedResolve = resolve));
+    const released = new Promise<void>((resolve) => (release = resolve));
+    this.bodyHolds.push({
+      path,
+      streamed: options.streamed ?? false,
+      reachedResolve,
+      released,
+    });
+    return { reached, release };
+  }
+
+  private withHeldBody(path: string, response: Response): Response {
+    const index = this.bodyHolds.findIndex((hold) => hold.path === path);
+    if (index < 0 || !response.ok) return response;
+    const [hold] = this.bodyHolds.splice(index, 1);
+    const encoder = new TextEncoder();
+    const source = response.text();
+    let sentFirst = false;
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        const text = await source;
+        if (hold.streamed && !sentFirst) {
+          sentFirst = true;
+          controller.enqueue(encoder.encode("first-chunk;"));
+          return;
+        }
+        hold.reachedResolve();
+        await hold.released;
+        controller.enqueue(encoder.encode(hold.streamed ? "second-chunk" : text));
+        controller.close();
+      },
+    });
+    return new Response(body, { status: response.status, headers: response.headers });
+  }
+
   private takeGate(method: string, path: string) {
     for (const hold of this.holds) {
       if (hold.remaining > 0 && hold.match(method, path)) {
@@ -127,7 +177,7 @@ export class FakeApi {
         void gate.released.then(resolve);
       });
     }
-    return this.respond(method, path, init, servedAs);
+    return this.withHeldBody(path, this.respond(method, path, init, servedAs));
   };
 
   private respond(method: string, path: string, init: RequestInit | undefined, servedAs: Identity | null): Response {
@@ -153,6 +203,12 @@ export class FakeApi {
       const token = new Headers(init?.headers).get("X-CSRF-Token");
       if (token !== csrfOf(servedAs)) {
         return json(403, { statusCode: 403, message: "CSRF-Prüfung fehlgeschlagen", code: "CSRF_INVALID" });
+      }
+      if (path === "/ai/chat/stream") {
+        return new Response("data: {}\n\n", {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream", ...context },
+        });
       }
       return json(201, { ok: true, by: servedAs.user.id }, context);
     }
