@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
 
 export type TaskStatus =
@@ -89,8 +89,7 @@ function toDateInputValue(isoString: string | null): string {
   return isoString.slice(0, 10);
 }
 
-export function TaskFormModal({
-  isOpen,
+function TaskFormModalContent({
   task,
   projects,
   users,
@@ -98,43 +97,26 @@ export function TaskFormModal({
   onClose,
   onSaved,
 }: TaskFormModalProps) {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [formState, setFormState] = useState<FormState>(() =>
+    task
+      ? {
+          projectId: task.project?.id ?? "",
+          title: task.title,
+          description: task.description ?? "",
+          status: task.status,
+          priority: task.priority,
+          responsibleUserId:
+            task.assignments.find(
+              (assignment) => assignment.role === "RESPONSIBLE",
+            )?.userId ?? "",
+          startAt: toDateInputValue(task.startAt),
+          dueAt: toDateInputValue(task.dueAt),
+        }
+      : { ...initialFormState, projectId: defaultProjectId ?? "" },
+  );
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    if (task) {
-      const responsible = task.assignments.find(
-        (assignment) => assignment.role === "RESPONSIBLE",
-      );
-      setFormState({
-        projectId: task.project?.id ?? "",
-        title: task.title,
-        description: task.description ?? "",
-        status: task.status,
-        priority: task.priority,
-        responsibleUserId: responsible?.userId ?? "",
-        startAt: toDateInputValue(task.startAt),
-        dueAt: toDateInputValue(task.dueAt),
-      });
-    } else {
-      setFormState({
-        ...initialFormState,
-        projectId: defaultProjectId ?? "",
-      });
-    }
-    setError(null);
-    setWarning(null);
-  }, [isOpen, task, defaultProjectId]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -436,4 +418,15 @@ export function TaskFormModal({
       </div>
     </div>
   );
+}
+
+/**
+ * Mounted only while open (and re-keyed per record), so every opening starts
+ * from fresh form state without an effect that resets it.
+ */
+export function TaskFormModal(props: TaskFormModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+  return <TaskFormModalContent key={`${props.task?.id ?? "new"}:${props.defaultProjectId ?? ""}`} {...props} />;
 }

@@ -1,14 +1,15 @@
-import { ACCESS_TOKEN_KEY, logout } from "@/lib/session";
+import {
+  API_URL,
+  handleSessionExpired,
+  sendAsCurrentIdentity,
+  startSession,
+  type SessionInfo,
+} from "@/lib/session";
 
-export type AuthResponse = {
-  accessToken: string;
-};
+export { SessionChangedError } from "@/lib/session";
 
 export type ForgotPasswordResponse = {
   message: string;
-  resetToken?: string;
-  resetUrl?: string;
-  expiresAt?: string;
 };
 
 export type ResetPasswordResponse = {
@@ -17,7 +18,6 @@ export type ResetPasswordResponse = {
 
 type AuthRequestBody =
   | LoginInput
-  | RegisterInput
   | { email: string }
   | { token: string; password: string };
 
@@ -26,12 +26,14 @@ export type LoginInput = {
   password: string;
 };
 
-export type RegisterInput = LoginInput & {
-  displayName: string;
-};
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+async function readErrorMessage(response: Response) {
+  const payload = (await response.json().catch(() => null)) as {
+    message?: string | string[];
+  } | null;
+  return Array.isArray(payload?.message)
+    ? payload.message.join(" ")
+    : payload?.message;
+}
 
 async function handleResponse<T>(
   response: Response,
@@ -39,77 +41,107 @@ async function handleResponse<T>(
 ): Promise<T> {
   if (response.status === 401) {
     if (redirectOnUnauthorized) {
-      logout({ expired: true });
+      handleSessionExpired();
     }
 
     throw new Error("Sitzung abgelaufen");
   }
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as {
-      message?: string | string[];
-    } | null;
-    const message = Array.isArray(payload?.message)
-      ? payload.message.join(" ")
-      : payload?.message;
-
+    const message = await readErrorMessage(response);
     throw new Error(message ?? "Anfrage fehlgeschlagen. Bitte erneut versuchen.");
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
   return (await response.json()) as T;
+}
+
+function isRawBody(body: BodyInit | null | undefined) {
+  return (
+    body instanceof FormData ||
+    body instanceof Blob ||
+    body instanceof URLSearchParams ||
+    body instanceof ArrayBuffer
+  );
+}
+
+/**
+ * Every authenticated browser request goes through here: the session cookie
+ * is sent by the browser (credentials: "include"), mutations get the session's
+ * CSRF token in the X-CSRF-Token header. FormData/Blob bodies keep the
+ * browser's own Content-Type (multipart boundary). Retry and identity rules
+ * live in sendAsCurrentIdentity (lib/session.ts).
+ */
+function sendWithSession(
+  path: string,
+  init: RequestInit | undefined,
+): Promise<Response> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  return sendAsCurrentIdentity(method, (csrfToken, contextSignal) => {
+    const headers = new Headers(init?.headers);
+    if (init?.body && !isRawBody(init.body) && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+    if (csrfToken) {
+      headers.set("X-CSRF-Token", csrfToken);
+    }
+    // Safe requests are aborted when the page's session context changes.
+    const signals = [init?.signal, contextSignal].filter(
+      (signal): signal is AbortSignal => Boolean(signal),
+    );
+    return fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: "include",
+      signal: signals.length > 1 ? AbortSignal.any(signals) : signals[0],
+    });
+  });
 }
 
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const headers = new Headers(init?.headers);
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem(ACCESS_TOKEN_KEY)
-      : null;
-
-  if (!headers.has("Content-Type") && init?.body) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers,
-  });
-
-  return handleResponse<T>(response);
+  return handleResponse<T>(await sendWithSession(path, init));
 }
 
-async function requestAuth(
-  path: "login" | "register" | "forgot-password" | "reset-password",
+/** Like apiFetch, but returns the raw Response (for streams and file downloads). */
+export async function apiFetchRaw(path: string, init?: RequestInit) {
+  const response = await sendWithSession(path, init);
+  if (!response.ok) {
+    // Reuse the shared error handling (401 redirect, message extraction).
+    await handleResponse(response);
+  }
+  return response;
+}
+
+async function requestAuth<T>(
+  path: "login" | "forgot-password" | "reset-password",
   body: AuthRequestBody,
-): Promise<AuthResponse | ForgotPasswordResponse | ResetPasswordResponse> {
+): Promise<T> {
   const response = await fetch(`${API_URL}/auth/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(body),
   });
 
-  return handleResponse(response, { redirectOnUnauthorized: false });
+  return handleResponse<T>(response, { redirectOnUnauthorized: false });
 }
 
-export function login(input: LoginInput) {
-  return requestAuth("login", input) as Promise<AuthResponse>;
-}
-
-export function register(input: RegisterInput) {
-  return requestAuth("register", input) as Promise<AuthResponse>;
+/** Signs in; the server sets the HttpOnly session cookie. */
+export async function login(input: LoginInput) {
+  const session = await requestAuth<SessionInfo>("login", input);
+  startSession(session);
+  return session;
 }
 
 export function forgotPassword(input: { email: string }) {
-  return requestAuth("forgot-password", input) as Promise<ForgotPasswordResponse>;
+  return requestAuth<ForgotPasswordResponse>("forgot-password", input);
 }
 
 export function resetPassword(input: { token: string; password: string }) {
-  return requestAuth("reset-password", input) as Promise<ResetPasswordResponse>;
+  return requestAuth<ResetPasswordResponse>("reset-password", input);
 }

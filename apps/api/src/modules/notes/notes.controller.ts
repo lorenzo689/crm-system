@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -29,11 +30,13 @@ export class NotesController {
   @Get()
   async findAll(
     @Req() req: Request,
-    @Query('customerId') customerId?: string,
-    @Query('projectId') projectId?: string,
-    @Query('taskId') taskId?: string,
+    @Query('customerId', new ParseUUIDPipe({ optional: true }))
+    customerId?: string,
+    @Query('projectId', new ParseUUIDPipe({ optional: true }))
+    projectId?: string,
+    @Query('taskId', new ParseUUIDPipe({ optional: true })) taskId?: string,
     @Query('type') type?: NoteType,
-    @Query('authorId') authorId?: string,
+    @Query('authorId', new ParseUUIDPipe({ optional: true })) authorId?: string,
   ) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
@@ -49,7 +52,7 @@ export class NotesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -68,7 +71,7 @@ export class NotesController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateNoteDto,
     @Req() req: Request,
   ) {
@@ -76,15 +79,15 @@ export class NotesController {
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.notesService.update(id, organizationId, dto);
+    return this.notesService.update(id, organizationId, payload.sub, dto);
   }
 
   @Post(':id/archive')
-  async archive(@Param('id') id: string, @Req() req: Request) {
+  async archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
     );
-    return this.notesService.archive(id, organizationId);
+    return this.notesService.archive(id, organizationId, payload.sub);
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ACCESS_TOKEN_KEY } from "@/lib/session";
+import { uploadDocumentVersion } from "@/lib/documents";
 
 type VersionUploadModalProps = {
   documentId: string;
@@ -48,29 +48,7 @@ export function VersionUploadModal({
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
-
-      const response = await fetch(
-        `${apiUrl}/documents/${documentId}/versions`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        },
-      );
-
-      if (!response.ok) {
-        const errorBody = (await response.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(errorBody?.message ?? "Upload fehlgeschlagen");
-      }
-
+      await uploadDocumentVersion(documentId, file);
       setFile(null);
       onUploaded();
       onClose();

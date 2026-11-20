@@ -1,21 +1,24 @@
+import 'dotenv/config';
+import { ConsoleLogger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { configureApp } from './app-setup';
+import { assertBackgroundJobConfig } from './common/jobs/background-jobs.config';
+import { assertAuthConfig } from './modules/auth/auth-config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api/v1');
-  app.enableCors({
-    origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  // Refuse to start with an unsafe auth configuration instead of failing later.
+  assertAuthConfig();
+  assertBackgroundJobConfig();
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+    // LOG_FORMAT=json: one JSON object per line (containers, log shipping).
+    logger: new ConsoleLogger({ json: process.env.LOG_FORMAT === 'json' }),
   });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-  await app.listen(process.env.PORT ?? 3001);
+  configureApp(app);
+  app.enableShutdownHooks();
+  await app.listen(process.env.PORT ?? 4000);
 }
 
 void bootstrap();

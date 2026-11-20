@@ -1,5 +1,9 @@
 import { loadMyTasks } from './dashboard-data';
 
+/** expect.objectContaining with a real type instead of `any`. */
+const containing = <T extends object>(value: T): T =>
+  expect.objectContaining(value) as T;
+
 describe('loadMyTasks', () => {
   it('includes tasks without project with a null projectName', async () => {
     const findMany = jest.fn(() =>
@@ -32,12 +36,12 @@ describe('loadMyTasks', () => {
     );
 
     expect(result).toEqual([
-      expect.objectContaining({ id: 't1', projectName: null, isOverdue: true }),
-      expect.objectContaining({ id: 't2', projectName: 'Halle' }),
+      containing({ id: 't1', projectName: null, isOverdue: true }),
+      containing({ id: 't2', projectName: 'Halle' }),
     ]);
     expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
+      containing({
+        where: containing({
           organizationId: 'org-1',
           assignments: { some: { userId: 'user-1' } },
         }),

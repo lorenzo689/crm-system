@@ -54,7 +54,7 @@ export class DocumentsRepository {
             },
             select: { id: true },
           })
-        : Promise.resolve([]),
+        : Promise.resolve([] as { id: string }[]),
     ]);
 
     if (!query) return documents;

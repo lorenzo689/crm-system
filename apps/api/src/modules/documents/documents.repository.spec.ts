@@ -1,6 +1,10 @@
 import type { PrismaService } from '../../common/prisma/prisma.service';
 import { DocumentsRepository } from './documents.repository';
 
+/** expect.objectContaining with a real type instead of `any`. */
+const containing = <T extends object>(value: T): T =>
+  expect.objectContaining(value) as T;
+
 describe('DocumentsRepository', () => {
   const findMany = jest.fn();
   const prisma = { document: { findMany } };
@@ -22,8 +26,8 @@ describe('DocumentsRepository', () => {
     await repository.findAll('organization-1', { scope });
 
     expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
+      containing({
+        where: containing({
           organizationId: 'organization-1',
           archivedAt: null,
           ...expected,
@@ -36,8 +40,8 @@ describe('DocumentsRepository', () => {
     await repository.findAll('organization-2', { type: 'DATASHEET' });
 
     expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
+      containing({
+        where: containing({
           organizationId: 'organization-2',
           type: 'DATASHEET',
         }),
@@ -124,8 +128,8 @@ describe('DocumentsRepository', () => {
 
     expect(result.map((document) => document.id)).toEqual(['content-match']);
     expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
+      containing({
+        where: containing({
           organizationId: 'organization-1',
           archivedAt: null,
           currentVersion: {
@@ -141,9 +145,9 @@ describe('DocumentsRepository', () => {
     await repository.findAll('organization-1', {});
 
     expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        include: expect.objectContaining({
-          currentVersion: expect.objectContaining({
+      containing({
+        include: containing({
+          currentVersion: containing({
             omit: { extractedText: true },
           }),
         }),
@@ -160,15 +164,15 @@ describe('DocumentsRepository', () => {
     await repo.findById('document-1', 'organization-1');
 
     expect(findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        include: expect.objectContaining({
-          currentVersion: expect.objectContaining({
+      containing({
+        include: containing({
+          currentVersion: containing({
             omit: { extractedText: true },
             include: {
               uploadedBy: { select: { id: true, displayName: true } },
             },
           }),
-          versions: expect.objectContaining({ omit: { extractedText: true } }),
+          versions: containing({ omit: { extractedText: true } }),
         }),
       }),
     );

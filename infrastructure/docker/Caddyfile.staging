@@ -1,0 +1,77 @@
+# Private staging reverse proxy.
+#
+# Reached ONLY through Tailscale Serve on the host (HTTPS termination with the
+# tailnet certificate), which forwards to http://127.0.0.1:<STAGING_PROXY_PORT>.
+# The compose file publishes this listener on 127.0.0.1 only.
+#
+#   browser --HTTPS--> tailscale serve (host) --HTTP--> caddy :80 --> web / api
+#
+# Same origin for the web app and /api/v1, so session cookies stay
+# __Host-, Secure, HttpOnly and the Sprint-2 origin/CSRF checks apply.
+{
+	admin off
+	auto_https off
+	servers {
+		# Only peers on loopback/docker networks can talk to this listener; only
+		# their X-Forwarded-For is considered, read right-to-left (strict), so a
+		# client cannot inject its own address.
+		trusted_proxies static private_ranges
+		trusted_proxies_strict
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+:80 {
+	encode zstd gzip
+
+	# One id per request, never taken from the client.
+	request_header X-Request-Id {http.request.uuid}
+
+	handle /api/* {
+		reverse_proxy api:4000 {
+			# The API trusts exactly one proxy hop (TRUST_PROXY=1): it gets a
+			# single, already validated client address.
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Request-Id {http.request.uuid}
+			# Server-sent events (AI chat stream) are passed through unbuffered.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000 {
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Request-Id {http.request.uuid}
+		}
+	}
+
+	header {
+		# The tailnet host name is HTTPS-only (Tailscale Serve). No
+		# includeSubDomains: other ts.net names belong to other devices.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+		-X-Powered-By
+	}
+
+	# JSON access log to stdout. Caddy itself redacts Cookie, Set-Cookie and
+	# Authorization. Removed in addition: the CSRF token header, Tailscale
+	# identity headers (personal data) and reset tokens in query strings
+	# (/reset-password?token=...).
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Csrf-Token delete
+				request>headers>Tailscale-User-Login delete
+				request>headers>Tailscale-User-Name delete
+				request>headers>Tailscale-User-Profile-Pic delete
+				request>uri query {
+					delete token
+				}
+			}
+		}
+	}
+}

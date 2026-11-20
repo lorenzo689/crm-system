@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AccessService } from '../access/access.service';
 import { ActivitiesService } from '../activities/activities.service';
 import {
   type TaskAssignmentRole,
@@ -24,12 +25,10 @@ export class TasksService {
     private readonly tasksRepository: TasksRepository,
     private readonly prisma: PrismaService,
     private readonly activitiesService: ActivitiesService,
+    private readonly access: AccessService,
   ) {}
 
-  private async assertProjectExists(
-    projectId: string,
-    organizationId: string,
-  ) {
+  private async assertProjectExists(projectId: string, organizationId: string) {
     const project = await this.prisma.project.findFirst({
       where: { id: projectId, organizationId },
     });
@@ -57,6 +56,7 @@ export class TasksService {
   ) {
     if (dto.projectId) {
       await this.assertProjectExists(dto.projectId, organizationId);
+      await this.access.assertProjectWritable(dto.projectId, actorUserId);
     }
 
     const task = await this.tasksRepository.create({
@@ -65,8 +65,7 @@ export class TasksService {
       createdByUserId: actorUserId,
       startAt: dto.startAt ? new Date(dto.startAt) : undefined,
       dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
-      completedAt:
-        dto.status === TaskStatus.COMPLETED ? new Date() : undefined,
+      completedAt: dto.status === TaskStatus.COMPLETED ? new Date() : undefined,
     });
 
     await this.activitiesService.log({
@@ -95,10 +94,15 @@ export class TasksService {
     dto: UpdateTaskDto,
   ) {
     const existingTask = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(
+      existingTask.projectId,
+      actorUserId,
+    );
 
     const { projectId, ...taskFields } = dto;
     if (projectId) {
       await this.assertProjectExists(projectId, organizationId);
+      await this.access.assertProjectWritable(projectId, actorUserId);
     }
 
     let completedAt: Date | null | undefined = undefined;
@@ -140,6 +144,7 @@ export class TasksService {
 
   async complete(id: string, organizationId: string, actorUserId: string) {
     const task = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(task.projectId, actorUserId);
     const updated = await this.tasksRepository.update(id, {
       status: TaskStatus.COMPLETED,
       completedAt: new Date(),
@@ -157,6 +162,7 @@ export class TasksService {
 
   async cancel(id: string, organizationId: string, actorUserId: string) {
     const task = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(task.projectId, actorUserId);
     const updated = await this.tasksRepository.update(id, {
       status: TaskStatus.CANCELLED,
       completedAt: null,
@@ -174,6 +180,7 @@ export class TasksService {
 
   async archive(id: string, organizationId: string, actorUserId: string) {
     const task = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(task.projectId, actorUserId);
     const archived = await this.tasksRepository.archive(id);
 
     await this.activitiesService.log({
@@ -186,8 +193,9 @@ export class TasksService {
     return archived;
   }
 
-  async unarchive(id: string, organizationId: string) {
-    await this.findOne(id, organizationId);
+  async unarchive(id: string, organizationId: string, actorUserId: string) {
+    const task = await this.findOne(id, organizationId);
+    await this.access.assertProjectWritable(task.projectId, actorUserId);
     return this.tasksRepository.unarchive(id);
   }
 
@@ -198,7 +206,9 @@ export class TasksService {
     userId: string,
     role: TaskAssignmentRole,
   ) {
-    await this.findOne(taskId, organizationId);
+    const task = await this.findOne(taskId, organizationId);
+    await this.access.assertProjectWritable(task.projectId, actorUserId);
+    await this.access.assertActiveOrganizationMember(organizationId, userId);
 
     const existing = await this.tasksRepository.findAssignment(taskId, userId);
     if (existing) {
@@ -227,8 +237,10 @@ export class TasksService {
     taskId: string,
     organizationId: string,
     userId: string,
+    actorUserId: string,
   ) {
-    await this.findOne(taskId, organizationId);
+    const task = await this.findOne(taskId, organizationId);
+    await this.access.assertProjectWritable(task.projectId, actorUserId);
 
     const existing = await this.tasksRepository.findAssignment(taskId, userId);
     if (!existing) {

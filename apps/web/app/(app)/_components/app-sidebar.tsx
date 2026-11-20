@@ -8,9 +8,15 @@ import {
   TbLayoutSidebarLeftExpand,
 } from "react-icons/tb";
 
-import { menuItems, type MenuItem } from "./app-data";
-import { cn, SIDEBAR_CLOSED_WIDTH, SIDEBAR_OPEN_WIDTH } from "./app-utils";
+import { menuItems, prefetchPaths, type MenuItem } from "./app-data";
+import { prefetchApi } from "@/lib/use-api";
+import {
+  cn,
+  SIDEBAR_CLOSED_WIDTH,
+  SIDEBAR_OPEN_WIDTH,
+} from "./app-utils";
 import { apiFetch } from "@/lib/auth-api";
+import { isAdminRole } from "@/lib/use-current-user";
 import {
   getUserInitials,
   organizationRoleLabels,
@@ -94,10 +100,15 @@ export function AppSidebar({ isOpen, onToggleSidebar }: AppSidebarProps) {
 
       <nav
         aria-label="Hauptnavigation"
-        className={cn("min-h-0 flex-1", isOpen ? "mt-6" : "mt-8")}
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overflow-x-hidden",
+          isOpen ? "mt-6" : "mt-8",
+        )}
       >
         <ul className="space-y-0.5">
-          {menuItems.map((item) => (
+          {menuItems
+            .filter((item) => !item.adminOnly || isAdminRole(user?.organizationRole))
+            .map((item) => (
             <SidebarMenuItem
               key={item.href}
               item={item}
@@ -177,6 +188,10 @@ function SidebarMenuItem({
     >
       <Link
         href={item.href}
+        onMouseEnter={() => {
+          const path = prefetchPaths[item.href];
+          if (path) prefetchApi(path);
+        }}
         className={cn(
           "flex w-full cursor-pointer items-center text-left",
           isSidebarOpen ? "justify-start gap-x-4" : "justify-center",

@@ -59,10 +59,22 @@ export function NotificationMenu() {
     }
   }
 
+  // Polls the badge counter; state is only set from the request callback.
   useEffect(() => {
-    loadUnreadCount();
-    const interval = setInterval(loadUnreadCount, 60000);
-    return () => clearInterval(interval);
+    let active = true;
+    const refresh = () => {
+      apiFetch<{ count: number }>("/notifications/unread-count")
+        .then(({ count }) => {
+          if (active) setUnreadCount(count);
+        })
+        .catch(() => undefined); // Badge-Zaehler ist nicht kritisch
+    };
+    refresh();
+    const interval = setInterval(refresh, 60000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
