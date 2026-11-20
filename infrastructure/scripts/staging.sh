@@ -101,16 +101,21 @@ cmd_up() {
   wait_ready
 }
 
+# The backup directory belongs to uid 70 (mode 0700, files 0600), so an
+# unprivileged operator or monitoring user cannot read it from the host. All
+# reads therefore go through the backup container, which runs as that user.
+# (MSYS2_ARG_CONV_EXCL only matters for Git Bash on Windows: container paths are kept.)
+backup_exec() { MSYS2_ARG_CONV_EXCL="/opt/;/backups" compose exec -T backup "$@"; }
+
 latest_backup_age_hours() {
-  local dir file
-  dir="$(env_value STAGING_BACKUP_DIR)"
-  file="${dir}/last-success"
-  [ -f "$file" ] || { echo 99999; return; }
-  echo $(( ( $(date +%s) - $(date -d "$(cat "$file")" +%s) ) / 3600 ))
+  local stamp
+  stamp="$(backup_exec cat /backups/last-success 2>/dev/null | tr -d '\r')" || stamp=""
+  [ -n "$stamp" ] || { echo 99999; return; }
+  echo $(( ( $(date +%s) - $(date -d "$stamp" +%s) ) / 3600 ))
 }
 
 cmd_backup() {
-  compose exec -T backup /opt/backup/backup.sh
+  backup_exec /opt/backup/backup.sh
 }
 
 cmd_migrate() {
@@ -184,7 +189,7 @@ cmd_rollback() {
 cmd_diagnose() {
   cmd_health || true
   echo "--- backups"
-  ls -lh "$(env_value STAGING_BACKUP_DIR)" 2>/dev/null | tail -5
+  backup_exec ls -lh /backups 2>/dev/null | tail -5 || true
   echo "last success age (h): $(latest_backup_age_hours)"
   echo "--- background jobs"
   sql 'SELECT name, "lastStatus", "lastSucceededAt", "consecutiveFailures" FROM background_job_runs ORDER BY name;' || true

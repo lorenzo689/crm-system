@@ -12,11 +12,14 @@ source "$(dirname "$0")/lib.sh"
 : "${API_IMAGE:?}" "${WEB_IMAGE:?}" "${MIGRATE_IMAGE:?}" "${BACKUP_IMAGE:?}"
 PROJECT="${SMOKE_PROJECT:-bos-smoke}"
 DIR="${WORK_ROOT}/${PROJECT}"
-rm -rf "$DIR"
+purge_dir "$DIR"
 write_test_env "$PROJECT" "$DIR"
 cleanup() {
   if [ "${KEEP_STACK:-0}" != "1" ]; then
     compose "$DIR" down -v --remove-orphans >/dev/null 2>&1 || true
+    # The backups belong to uid 70; remove them as root so the workspace stays
+    # deletable for the CI runner.
+    purge_dir "${DIR}/backups"
   fi
 }
 trap cleanup EXIT
@@ -142,9 +145,34 @@ for _ in $(seq 1 30); do ready 200 && break; sleep 2; done
 check "database back -> readiness 200" ready 200
 
 echo "== backup"
-check "encrypted backup succeeds" compose "$DIR" exec -T backup "$(cpath /opt/backup/backup.sh)"
-check "backup file and checksum exist" bash -c "ls \"$DIR\"/backups/bissinger-os-*.tar.age >/dev/null && ls \"$DIR\"/backups/bissinger-os-*.tar.age.sha256 >/dev/null"
-check "backup is not readable without the private key (age header)" bash -c "head -c 21 \"\$(ls \"$DIR\"/backups/bissinger-os-*.tar.age | head -1)\" | grep -q 'age-encryption.org'"
+check "encrypted backup succeeds" backup_exec "$DIR" /opt/backup/backup.sh
+BACKUP_NAME="$(latest_backup_name "$DIR")"
+# Backups are 0600 files owned by uid 70 in a 0700 directory: they are read
+# through the backup container (as that user), never from the host side.
+backup_files_exist() {
+  backup_exec "$DIR" sh -c "test -s /backups/${BACKUP_NAME} && test -s /backups/${BACKUP_NAME}.sha256"
+}
+backup_is_age_encrypted() {
+  backup_exec "$DIR" head -c 21 "/backups/${BACKUP_NAME}" | grep -q 'age-encryption.org'
+}
+check "backup file and checksum exist" backup_files_exist
+check "backup is encrypted, not readable without the private key (age header)" backup_is_age_encrypted
+
+# Permission model (Linux hosts enforce it; bind mounts of Docker Desktop on
+# Windows/macOS do not, there permissions-test.sh covers it on a Docker volume).
+backup_permissions_are_restrictive() {
+  [ "$(backup_exec "$DIR" stat -c '%a:%U' "/backups/${BACKUP_NAME}" | tr -d '\r')" = "600:postgres" ] &&
+    [ "$(backup_exec "$DIR" stat -c '%a' /backups | tr -d '\r')" = 700 ]
+}
+host_user_cannot_read_backups() {
+  ! head -c 1 "${DIR}/backups/${BACKUP_NAME}" >/dev/null 2>&1 && ! ls "${DIR}/backups" >/dev/null 2>&1
+}
+if [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ]; then
+  check "backup files are 0600 owned by the backup user, the directory 0700 (never 644/777)" backup_permissions_are_restrictive
+  check "the unprivileged host user can neither read nor list the backups" host_user_cannot_read_backups
+else
+  echo "SKIP  host-side backup permission checks (needs an unprivileged Linux host; see permissions-test.sh)"
+fi
 
 echo "== persistence across a full restart"
 compose "$DIR" down >/dev/null

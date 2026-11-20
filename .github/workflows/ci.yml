@@ -85,6 +85,8 @@ jobs:
             test "$(docker run --rm --entrypoint id "$image" -u)" != 0
             test -z "$(docker run --rm --entrypoint sh "$image" -c 'find / -name ".env" -not -path "/proc/*" 2>/dev/null')"
           done
+      - name: Backup permission regression test (uid 70 files stay 0600, unprivileged users are refused)
+        run: bash infrastructure/tests/permissions-test.sh
       - name: Staging smoke test (proxy, HTTPS origin, cookies, CSRF, documents, jobs, ports, readiness, backup, persistence)
         run: bash infrastructure/tests/staging-smoke.sh
       - name: Backup and restore test (fresh environment, hashes, migrations)

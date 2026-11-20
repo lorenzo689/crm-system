@@ -28,6 +28,10 @@ Ein Backup-Satz (`bissinger-os-<UTC-Zeitstempel>.tar.age`) enthält:
 - **Der private Schlüssel** (`*.agekey`) wird auf einem Admin-Rechner erzeugt und offline aufbewahrt, z. B. im Passwortmanager plus eine ausgedruckte Kopie im Tresor. Ohne ihn ist keine Wiederherstellung möglich, auch nicht nach Verlust des Hosts. Der Schlüssel muss deshalb an **zwei getrennten Orten** liegen.
 - Mehrere Empfänger sind möglich: eine Zeile pro Schlüssel in der Recipients-Datei, z. B. IT-Leitung und Notfallschlüssel.
 - **Dateirechte:** Das Backup-Verzeichnis hat Modus 700 (uid 70), die Dateien 600 (`umask 077`). Zugangsdaten stehen nur in Umgebungsvariablen; es gibt keine rclone-Konfigurationsdatei mit Secrets.
+  - Ein unprivilegierter Host-Benutzer kann die Backups deshalb weder lesen noch auflisten. Das ist gewollt und wird nicht per `chmod` aufgeweicht.
+  - Zum Lesen oder Kopieren: als root (`sudo`), mit `docker compose exec backup …` oder mit `docker compose cp backup:/backups/<datei> <ziel>`. Die Kopie gehört dem aufrufenden Benutzer und behält Modus 600.
+  - `staging.sh monitor` und `diagnose` lesen das Backup-Alter ebenfalls über den Container und brauchen keine Rechte auf dem Host-Verzeichnis.
+  - Test: `infrastructure/tests/permissions-test.sh` prüft das Rechtemodell auf einem echten Linux-Dateisystem.
 
 ## Ablauf eines Backups
 

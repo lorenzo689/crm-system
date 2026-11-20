@@ -10,15 +10,26 @@ source "$(dirname "$0")/lib.sh"
 : "${API_IMAGE:?}" "${WEB_IMAGE:?}" "${MIGRATE_IMAGE:?}" "${BACKUP_IMAGE:?}"
 SRC="${WORK_ROOT}/bos-restore-src"
 DST="${WORK_ROOT}/bos-restore-dst"
+# VAULT: host-owned test files (original and restored PDFs).
+# STAGE: the backup archive, its checksum and the age identities, handed to the
+# backup user (uid 70, mode 0700/0600) because the restore container reads them.
 VAULT="${WORK_ROOT}/restore-vault"
+STAGE="${WORK_ROOT}/restore-stage"
 REPORT="${WORK_ROOT}/restore-report.md"
-rm -rf "$SRC" "$DST" "$VAULT"
-mkdir -p "$VAULT"
+purge_dir "$SRC"
+purge_dir "$DST"
+purge_dir "$STAGE"
+rm -rf "$VAULT"
+mkdir -p "$VAULT" "$STAGE"
 write_test_env bos-restore-src "$SRC"
 cleanup() {
   if [ "${KEEP_STACK:-0}" != "1" ]; then
     compose "$SRC" down -v --remove-orphans >/dev/null 2>&1 || true
     compose "$DST" down -v --remove-orphans >/dev/null 2>&1 || true
+    # Files owned by uid 70 are removed as root so the workspace stays deletable.
+    purge_dir "${SRC}/backups"
+    purge_dir "${DST}/backups"
+    purge_dir "$STAGE"
   fi
 }
 trap cleanup EXIT
@@ -53,14 +64,24 @@ echo "source counts (users,customers,projects,documents,versions,sessions,migrat
 
 echo "== backup"
 t0=$(now)
-check "backup succeeds" compose "$SRC" exec -T backup "$(cpath /opt/backup/backup.sh)"
+check "backup succeeds" backup_exec "$SRC" /opt/backup/backup.sh
 BACKUP_SECONDS=$(( $(now) - t0 ))
-BACKUP_FILE="$(ls -1 "${SRC}/backups"/bissinger-os-*.tar.age | tail -1)"
-cp "$BACKUP_FILE" "${BACKUP_FILE}.sha256" "$VAULT/"
-cp "${SRC}/age-identity.txt" "${VAULT}/age-identity.txt"
-chmod 644 "$VAULT"/*
-BACKUP_NAME="$(basename "$BACKUP_FILE")"
-BACKUP_BYTES=$(stat -c %s "$BACKUP_FILE")
+BACKUP_NAME="$(latest_backup_name "$SRC")"
+BACKUP_BYTES="$(backup_exec "$SRC" stat -c %s "/backups/${BACKUP_NAME}" | tr -d '\r')"
+# The backups directory belongs to uid 70 (0700) and the files are 0600, so the
+# host user cannot copy them directly. `compose cp` hands out host-owned copies
+# with the original mode; the originals stay protected.
+compose "$SRC" cp "backup:/backups/${BACKUP_NAME}" "${STAGE}/${BACKUP_NAME}" >/dev/null
+compose "$SRC" cp "backup:/backups/${BACKUP_NAME}.sha256" "${STAGE}/${BACKUP_NAME}.sha256" >/dev/null
+archive_copied() { [ -s "${STAGE}/${BACKUP_NAME}" ] && [ -s "${STAGE}/${BACKUP_NAME}.sha256" ]; }
+check "backup archive and checksum copied out of the backup container" archive_copied
+(umask 077 && cp "${SRC}/age-identity.txt" "${STAGE}/age-identity.txt")
+# Inputs for the negative tests, created while the files are still ours.
+cp "${STAGE}/${BACKUP_NAME}" "${STAGE}/corrupt.tar.age"
+printf 'X' | dd of="${STAGE}/corrupt.tar.age" bs=1 seek=4000 conv=notrunc 2>/dev/null
+(umask 077 && docker run --rm --entrypoint age-keygen "$BACKUP_IMAGE" > "${STAGE}/wrong-identity.txt" 2>/dev/null)
+# The restore container (uid 70) reads the stage: owner 70, 0700/0600, never 644.
+hand_to_backup_user "$STAGE"
 
 echo "== destroy the source environment (containers and volumes)"
 compose "$SRC" down -v --remove-orphans >/dev/null
@@ -75,21 +96,30 @@ t_restore=$(now)
 compose "$DST" up -d --wait postgres seaweedfs >/dev/null
 compose "$DST" run --rm storage-init >/dev/null
 restore() {
-  compose "$DST" run --rm --no-deps -v "$(native_path "$VAULT"):/restore:ro" backup \
-    "$(cpath /opt/backup/restore.sh)" "$(cpath "/restore/$1")" "$(cpath "/restore/$2")"
+  compose_keep_container_paths "$DST" run --rm --no-deps -v "$(native_path "$STAGE"):/restore:ro" backup \
+    /opt/backup/restore.sh "/restore/$1" "/restore/$2"
 }
-restore_refused() { ! restore "$@" >/dev/null 2>&1; }
+# A refused restore must fail for the EXPECTED reason (message of restore.sh),
+# not for an unrelated one such as an unreadable input file.
+restore_refused_because() {
+  local pattern="$1" output
+  shift
+  if output="$(restore "$@" 2>&1)"; then
+    return 1
+  fi
+  grep -qE "$pattern" <<< "$output"
+}
 
 # Negative tests first: nothing may be restored from a broken input.
-cp "${VAULT}/${BACKUP_NAME}" "${VAULT}/corrupt.tar.age"
-printf 'X' | dd of="${VAULT}/corrupt.tar.age" bs=1 seek=4000 conv=notrunc 2>/dev/null
-check "corrupted backup is rejected" restore_refused corrupt.tar.age age-identity.txt
-docker run --rm --entrypoint age-keygen "$BACKUP_IMAGE" > "${VAULT}/wrong-identity.txt" 2>/dev/null
-check "wrong key is rejected" restore_refused "$BACKUP_NAME" wrong-identity.txt
+check "corrupted backup is rejected (decryption or checksum)" \
+  restore_refused_because 'reason=(decryption or archive|archive checksum mismatch|file checksum mismatch)' corrupt.tar.age age-identity.txt
+check "wrong key is rejected (decryption)" \
+  restore_refused_because 'reason=decryption or archive' "$BACKUP_NAME" wrong-identity.txt
 check "target still empty after rejected restores" [ "$(psql_value "$DST" "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" = 0 ]
 
 check "restore succeeds" restore "$BACKUP_NAME" age-identity.txt
-check "restore into a non-empty database is refused" restore_refused "$BACKUP_NAME" age-identity.txt
+check "restore into a non-empty database is refused (target not empty)" \
+  restore_refused_because 'reason=target database is not empty' "$BACKUP_NAME" age-identity.txt
 
 compose "$DST" up -d --wait --wait-timeout 300 >/dev/null
 compose "$DST" cp tls-gateway:/data/caddy/pki/authorities/local/root.crt "${DST}/ca.crt" >/dev/null
