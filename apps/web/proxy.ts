@@ -33,7 +33,7 @@ export function buildContentSecurityPolicy(nonce: string) {
     `img-src 'self' blob: data: ${api}`.trim(),
     "font-src 'self' data:",
     `connect-src 'self' ${api}${isDev ? " ws: wss:" : ""}`.trim(),
-    `frame-src 'self' ${api}`.trim(),
+    `frame-src 'self' blob: ${api}`.trim(),
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

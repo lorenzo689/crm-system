@@ -2,6 +2,7 @@
   "extends": "@bissinger-os/typescript-config/nextjs",
   "compilerOptions": {
     "incremental": true,
+    "allowImportingTsExtensions": true,
     "plugins": [
       {
         "name": "next"

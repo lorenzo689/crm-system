@@ -16,8 +16,16 @@ export type SessionInfo = {
   organization: { id: string; name: string } | null;
   role: OrganizationRole | null;
   csrfToken: string;
+  /**
+   * Non-secret marker of this exact session context (session + user +
+   * organization + role). The API repeats it in X-Session-Context on every
+   * authenticated answer; an answer is only used while both are equal.
+   */
+  contextId: string;
   expiresAt: string;
 };
+
+export const SESSION_CONTEXT_HEADER = "X-Session-Context";
 
 export type SessionState =
   | { status: "unknown" }
@@ -66,11 +74,59 @@ const CHANNEL_NAME = "bissinger-session";
 
 let state: SessionState = { status: "unknown" };
 let inflight: Promise<SessionInfo | null> | null = null;
+/** Number of the newest loadSession request; older answers are ignored. */
+let startedLoads = 0;
 const listeners = new Set<() => void>();
 
+/**
+ * Session-context epoch. Everything that depends on "who is this page" (API
+ * answers, cache entries, in-flight requests) is tied to the epoch it was
+ * started in. The epoch advances whenever the context key changes, which also
+ * aborts every request of the old context.
+ */
+let epoch = 0;
+let contextController = new AbortController();
+const contextListeners = new Set<() => void>();
+
+function contextKeyOf(value: SessionState) {
+  if (value.status === "authenticated") {
+    return value.identityChanged ? "blocked" : `ctx:${value.session.contextId}`;
+  }
+  return value.status;
+}
+
 function setState(next: SessionState) {
+  const changed = contextKeyOf(state) !== contextKeyOf(next);
   state = next;
+  if (changed) {
+    epoch += 1;
+    const previous = contextController;
+    contextController = new AbortController();
+    previous.abort();
+    for (const listener of contextListeners) listener();
+  }
   for (const listener of listeners) listener();
+}
+
+export function getContextEpoch() {
+  return epoch;
+}
+
+/** Called after the context changed (cache owners drop their entries). */
+export function subscribeContext(listener: () => void) {
+  contextListeners.add(listener);
+  return () => {
+    contextListeners.delete(listener);
+  };
+}
+
+/** The page may start authenticated requests (not blocked, not signed out). */
+export function canRequestData() {
+  return (
+    state.status === "unknown" ||
+    state.status === "error" ||
+    (state.status === "authenticated" && !state.identityChanged)
+  );
 }
 
 export function subscribeSession(listener: () => void) {
@@ -141,11 +197,15 @@ export function loadSession(
   if (inflight && !options.force) {
     return inflight;
   }
+  const seq = ++startedLoads;
+  // A newer check was started (or the page signed in/out) meanwhile: this
+  // answer is outdated and must neither sign anyone out nor restore anything.
+  const outdated = () => seq !== startedLoads;
   const request = (async () => {
     // A failed re-check must not tear down a page that is in use; only the
     // first check (nothing rendered yet) shows the error screen.
     const fail = (message: string): never => {
-      if (state.status !== "authenticated") {
+      if (state.status !== "authenticated" && !outdated()) {
         setState({ status: "error", message });
       }
       throw new Error(message);
@@ -160,6 +220,9 @@ export function loadSession(
       return fail("Server nicht erreichbar. Bitte Verbindung prüfen.");
     }
     if (response.status === 401) {
+      if (outdated()) {
+        return state.status === "authenticated" ? state.session : null;
+      }
       setState({ status: "anonymous" });
       return null;
     }
@@ -167,16 +230,23 @@ export function loadSession(
       return fail("Sitzung konnte nicht geprüft werden.");
     }
     const session = (await response.json()) as SessionInfo;
-    if (
-      state.status === "authenticated" &&
-      (state.identityChanged ||
-        identityOf(state.session) !== identityOf(session))
-    ) {
-      // Keep the page's own session (and its now useless CSRF token); callers
-      // compare identities and must not act on the new one.
-      setState({ ...state, identityChanged: true });
+    if (outdated()) {
       return session;
     }
+    if (state.status === "authenticated") {
+      if (state.identityChanged) {
+        // Sticky: a detected change is never undone by a later answer.
+        return session;
+      }
+      if (identityOf(state.session) !== identityOf(session)) {
+        // Keep the page's own session (and its now useless CSRF token);
+        // callers compare identities and must not act on the new one.
+        setState({ ...state, identityChanged: true });
+        return session;
+      }
+    }
+    // Same person and organization: a new session or role is adopted; the
+    // context epoch advances when the context id changed.
     setState({ status: "authenticated", session, identityChanged: false });
     return session;
   })();
@@ -223,11 +293,90 @@ async function isCsrfRejection(response: Response) {
   return body?.code === CSRF_ERROR_CODE;
 }
 
+type Sender = (
+  csrfToken: string | null,
+  signal: AbortSignal | undefined,
+) => Promise<Response>;
+
+function discard(response: Response) {
+  void response.body?.cancel().catch(() => undefined);
+}
+
+/** Still signed in as the same, unblocked person: asking again is allowed. */
+function mayRetryInNewContext() {
+  return canRequestData() && state.status === "authenticated";
+}
+
+/**
+ * Safe requests (GET/HEAD/OPTIONS) are bound to the session context:
+ *
+ * - the request is aborted when the page's context changes;
+ * - the answer must carry the context id the page expects. An answer for
+ *   another context (or without a marker) is never handed to the caller. The
+ *   session is re-read instead: another person/organization blocks the page,
+ *   the same person in a new session/role is adopted and the request is sent
+ *   once more under that context;
+ * - a 401 is only believed after the session was re-read (a late 401 of an
+ *   old cookie must not sign out a newer session).
+ */
+async function sendBoundToContext(send: Sender): Promise<Response> {
+  for (let attempt = 0; ; attempt += 1) {
+    if (state.status !== "authenticated") {
+      // Before the first session check there is no context to bind to.
+      return send(null, undefined);
+    }
+    const startedIn = epoch;
+    const expected = state.session.contextId;
+    let response: Response;
+    try {
+      response = await send(null, contextController.signal);
+    } catch (error) {
+      if (epoch === startedIn) throw error;
+      if (attempt === 0 && mayRetryInNewContext()) continue;
+      throw new SessionChangedError();
+    }
+    if (epoch !== startedIn) {
+      discard(response);
+      if (attempt === 0 && mayRetryInNewContext()) continue;
+      throw new SessionChangedError();
+    }
+    const actual = response.headers.get(SESSION_CONTEXT_HEADER);
+    if (actual === expected) {
+      return response;
+    }
+    // Error answers without any marker carry no data of another context.
+    if (actual === null && !response.ok && response.status !== 401) {
+      return response;
+    }
+    const fresh = await loadSession({ force: true }).catch(() => undefined);
+    if (fresh === undefined) {
+      discard(response);
+      throw new SessionChangedError(); // cannot verify: fail closed
+    }
+    if (fresh === null) {
+      // Really signed out: an honest 401 stays one, anything else is dropped.
+      if (response.status === 401) return response;
+      discard(response);
+      throw new SessionChangedError();
+    }
+    discard(response);
+    if (
+      attempt > 0 ||
+      !mayRetryInNewContext() ||
+      state.status !== "authenticated" ||
+      identityOf(state.session) !== identityOf(fresh)
+    ) {
+      throw new SessionChangedError();
+    }
+  }
+}
+
 /**
  * Sends a request on behalf of the page's current identity.
  *
  * - Nothing is sent once the identity has changed.
- * - Safe methods (GET/HEAD/OPTIONS) are never retried.
+ * - Safe methods (GET/HEAD/OPTIONS) are bound to the session context (see
+ *   sendBoundToContext) and retried at most once under the same person.
  * - A state-changing request is retried at most once, and only when the
  *   server answered with the CSRF code (any other 403 is final). Before that
  *   retry the session is re-read; if it now belongs to another user or
@@ -240,16 +389,16 @@ async function isCsrfRejection(response: Response) {
  */
 export async function sendAsCurrentIdentity(
   method: string,
-  send: (csrfToken: string | null) => Promise<Response>,
+  send: Sender,
 ): Promise<Response> {
   assertIdentityUnchanged();
   if (SAFE_METHODS.has(method.toUpperCase())) {
-    return send(null);
+    return sendBoundToContext(send);
   }
 
   const csrfToken = await getCsrfToken();
   const issuedAs = currentIdentity();
-  const response = await send(csrfToken);
+  const response = await send(csrfToken, undefined);
   if (!(await isCsrfRejection(response))) {
     return response;
   }
@@ -267,11 +416,12 @@ export async function sendAsCurrentIdentity(
   assertIdentityUnchanged();
   // Same user and organization, new session (e.g. a re-login in another tab):
   // one retry with that session's token; a second rejection is final.
-  return send(fresh.csrfToken);
+  return send(fresh.csrfToken, undefined);
 }
 
 /** Called with the login response body (which carries no credential). */
 export function startSession(session: SessionInfo) {
+  startedLoads += 1; // older session checks must not override this login
   safeSessionStorage()?.setItem(HAD_SESSION_KEY, "1");
   safeSessionStorage()?.removeItem(SESSION_NOTICE_KEY);
   setState({ status: "authenticated", session, identityChanged: false });
@@ -284,6 +434,7 @@ export function hadSession() {
 }
 
 function goToLogin(notice: string | null) {
+  startedLoads += 1;
   const storage = safeSessionStorage();
   storage?.removeItem(HAD_SESSION_KEY);
   if (notice) {
