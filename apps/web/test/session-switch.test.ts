@@ -43,10 +43,17 @@ const server = {
   beforeMutation: null as null | (() => void),
 };
 
-function json(status: number, body: unknown) {
+const contextOf = (identity: Identity) =>
+  `ctx:${identity.sid}:${identity.user.id}:${identity.organization.id}:${identity.role}`;
+
+function json(status: number, body: unknown, identity?: Identity) {
   return new Response(status === 204 ? null : JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      // What the real API sends on every authenticated answer.
+      ...(identity ? { "X-Session-Context": contextOf(identity) } : {}),
+    },
   });
 }
 
@@ -56,6 +63,7 @@ function sessionBody(identity: Identity) {
     organization: identity.organization,
     role: identity.role,
     csrfToken: csrfOf(identity),
+    contextId: contextOf(identity),
     expiresAt: "2030-01-01T00:00:00.000Z",
   };
 }
@@ -71,12 +79,12 @@ async function fakeFetch(input: string | URL | Request, init?: RequestInit) {
   if (path === "/auth/session") {
     server.sessionReads += 1;
     return server.cookie
-      ? json(200, sessionBody(server.cookie))
+      ? json(200, sessionBody(server.cookie), server.cookie)
       : json(401, { statusCode: 401, message: "Unauthorized" });
   }
   if (method === "GET") {
     return server.cookie
-      ? json(200, { as: server.cookie.user.id })
+      ? json(200, { as: server.cookie.user.id }, server.cookie)
       : json(401, { statusCode: 401 });
   }
 
@@ -97,7 +105,7 @@ async function fakeFetch(input: string | URL | Request, init?: RequestInit) {
   }
   server.executed.push({ path, as: `${cookie.user.id}|${cookie.organization.id}` });
   if (path === "/auth/logout") return json(204, null);
-  return json(201, { ok: true });
+  return json(201, { ok: true }, cookie);
 }
 
 // Minimal browser globals, installed before the client modules load.
