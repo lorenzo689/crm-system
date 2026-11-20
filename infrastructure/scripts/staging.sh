@@ -14,6 +14,7 @@
 #   staging.sh rollback                start the previous image set (see docs for DB)
 #   staging.sh diagnose                status, health, backups, jobs, recent errors
 #   staging.sh monitor                 non-zero exit + message if something is wrong
+#   staging.sh alert-test              send a test message through the alert channel
 #
 # Never deletes volumes except in `restore`, which asks for confirmation.
 set -euo pipefail
@@ -68,6 +69,13 @@ cmd_validate() {
   fi
   [ -r "$(env_value BACKUP_AGE_RECIPIENTS)" ] || die "BACKUP_AGE_RECIPIENTS file not readable"
   grep -q '^AGE-SECRET-KEY' "$(env_value BACKUP_AGE_RECIPIENTS)" && die "BACKUP_AGE_RECIPIENTS contains a PRIVATE key; only the public key belongs on this host"
+  # The backup container runs as uid 70. A missing directory would be created
+  # root-owned by Docker and every backup would fail (found only after the
+  # first-backup delay), so refuse to start instead.
+  local backup_dir
+  backup_dir="$(env_value STAGING_BACKUP_DIR)"
+  [ -d "$backup_dir" ] || die "STAGING_BACKUP_DIR ${backup_dir:-unset} does not exist: sudo install -d -m 700 -o 70 -g 70 <dir>"
+  [ "$(stat -c '%u %a' "$backup_dir")" = "70 700" ] || die "STAGING_BACKUP_DIR must be owned by uid 70 with mode 700: sudo install -d -m 700 -o 70 -g 70 ${backup_dir}"
   compose config -q
   log "configuration ok"
 }
@@ -205,11 +213,11 @@ cmd_diagnose() {
 cmd_monitor() {
   local problems=() service state restarts ready age failed_jobs usage errors
   for service in postgres seaweedfs api web proxy mailpit backup; do
-    state="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(project)-${service}-1" 2>/dev/null || echo missing)"
+    state="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(project)-${service}-1" 2>/dev/null)" || state=missing
     case "$state" in healthy|running) ;; *) problems+=("container ${service} is ${state}") ;; esac
   done
   for service in api web proxy postgres seaweedfs; do
-    restarts="$(docker inspect -f '{{.RestartCount}}' "$(project)-${service}-1" 2>/dev/null || echo 0)"
+    restarts="$(docker inspect -f '{{.RestartCount}}' "$(project)-${service}-1" 2>/dev/null)" || restarts=0
     [ "${restarts:-0}" -le "${MONITOR_MAX_RESTARTS:-3}" ] || problems+=("${service} restarted ${restarts} times")
   done
   ready="$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$(proxy_url)/api/v1/health/ready" || echo 000)"
@@ -234,6 +242,8 @@ cmd_monitor() {
   return 1
 }
 
+cmd_alert_test() { "${ROOT}/infrastructure/scripts/alert.sh" --test; }
+
 command="${1:-}"
 shift || true
 case "$command" in
@@ -250,5 +260,6 @@ case "$command" in
   rollback) cmd_rollback ;;
   diagnose) cmd_diagnose ;;
   monitor) cmd_monitor ;;
-  *) sed -n '2,18p' "$0"; exit 1 ;;
+  alert-test) cmd_alert_test ;;
+  *) sed -n '2,19p' "$0"; exit 1 ;;
 esac
