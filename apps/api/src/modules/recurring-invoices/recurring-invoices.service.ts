@@ -21,7 +21,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Prisma } from '../../../generated/prisma/client';
-import { BackgroundJobsService } from '../../common/jobs/background-jobs.service';
+import {
+  BackgroundJobsService,
+  JobLeaseLostError,
+  type JobContext,
+} from '../../common/jobs/background-jobs.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SalesDocumentItemDto } from '../sales-documents/dto/sales-document.dto';
 import { SalesDocumentsService } from '../sales-documents/sales-documents.service';
@@ -150,22 +154,27 @@ export class RecurringInvoicesService {
 
   @Cron('0 5 * * *', { name: 'recurring-invoices' })
   async runScheduledJob() {
-    await this.jobs?.run('recurring-invoices', () => this.runScheduled());
+    await this.jobs?.run('recurring-invoices', (context) =>
+      this.runScheduled(context),
+    );
   }
 
-  async runScheduled() {
+  async runScheduled(context?: JobContext) {
     const organizations = await this.prisma.recurringInvoice.findMany({
       where: { active: true, nextRunDate: { lte: new Date() } },
       distinct: ['organizationId'],
       select: { organizationId: true },
     });
     for (const { organizationId } of organizations) {
+      context?.assertLeaseHeld();
       try {
-        const created = await this.runDue(organizationId);
+        const created = await this.runDue(organizationId, context);
         this.logger.log(
           `Recurring invoices for ${organizationId}: ${created} draft(s)`,
         );
       } catch (error) {
+        // A lost lease ends the whole run; anything else is one organization.
+        if (error instanceof JobLeaseLostError) throw error;
         this.logger.error(
           `Recurring run failed for ${organizationId}: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -173,8 +182,19 @@ export class RecurringInvoicesService {
     }
   }
 
-  /** Creates invoice drafts (never issued ones) for every due template. */
-  async runDue(organizationId: string) {
+  /**
+   * Creates invoice drafts (never issued ones) for every due template.
+   *
+   * Exactly one draft per template and due date, even if the job crashes, runs
+   * twice or two instances overlap:
+   * - claim (advance `nextRunDate`, guarded by the old date) and creation of
+   *   the draft happen in ONE short transaction (fenced by the job lease when
+   *   a context is given). A crash or error anywhere rolls both back, so an
+   *   invoice is never lost to a half-done claim, and nothing is created twice;
+   * - the draft carries (`recurringInvoiceId`, `recurrenceDate`), which is
+   *   unique in the database, as the last line of defence.
+   */
+  async runDue(organizationId: string, context?: JobContext) {
     // Drafts are created in the name of an owner/admin; organizations that
     // have none yet (e.g. seeded without roles) fall back to the oldest member.
     const owner =
@@ -200,43 +220,78 @@ export class RecurringInvoicesService {
 
     let created = 0;
     for (const template of due) {
-      // Advance first with a guard on the old date, so two overlapping runs
-      // cannot both create the same invoice.
-      const claimed = await this.prisma.recurringInvoice.updateMany({
-        where: { id: template.id, nextRunDate: template.nextRunDate },
-        data: {
-          nextRunDate: nextRunAfter(
-            template.nextRunDate,
-            template.intervalMonths,
-            today,
-          ),
-          lastRunAt: now,
-        },
-      });
-      if (claimed.count === 0) continue;
-
+      context?.assertLeaseHeld();
       try {
-        await this.salesDocuments.create(organizationId, owner.userId, {
-          type: 'INVOICE',
-          customerId: template.customerId,
-          projectId: template.projectId ?? undefined,
-          issueDate: today.toISOString().slice(0, 10),
-          headerText: template.headerText ?? undefined,
-          footerText: template.footerText ?? undefined,
-          items: template.items as unknown as SalesDocumentItemDto[],
+        const draft = await this.inTransaction(context, async (tx) => {
+          const claimed = await tx.recurringInvoice.updateMany({
+            where: {
+              id: template.id,
+              active: true,
+              nextRunDate: template.nextRunDate,
+            },
+            data: {
+              nextRunDate: nextRunAfter(
+                template.nextRunDate,
+                template.intervalMonths,
+                today,
+              ),
+              lastRunAt: now,
+            },
+          });
+          if (claimed.count === 0) return null; // someone else did it
+          const existing = await tx.salesDocument.findFirst({
+            where: {
+              recurringInvoiceId: template.id,
+              recurrenceDate: template.nextRunDate,
+            },
+            select: { id: true },
+          });
+          if (existing) return null; // draft exists already, schedule advanced
+          return this.salesDocuments.create(
+            organizationId,
+            owner.userId,
+            {
+              type: 'INVOICE',
+              customerId: template.customerId,
+              projectId: template.projectId ?? undefined,
+              issueDate: today.toISOString().slice(0, 10),
+              headerText: template.headerText ?? undefined,
+              footerText: template.footerText ?? undefined,
+              items: template.items as unknown as SalesDocumentItemDto[],
+            },
+            {
+              tx,
+              recurrence: {
+                recurringInvoiceId: template.id,
+                recurrenceDate: template.nextRunDate,
+              },
+            },
+          );
         });
-        created++;
+        if (draft) {
+          created++;
+          // After commit; a failing activity entry never undoes the draft.
+          await this.salesDocuments
+            .logCreated(draft, owner.userId)
+            .catch(() => undefined);
+        }
       } catch (error) {
-        // Roll the schedule back so the template is retried tomorrow.
-        await this.prisma.recurringInvoice.update({
-          where: { id: template.id },
-          data: { nextRunDate: template.nextRunDate },
-        });
+        if (error instanceof JobLeaseLostError) throw error;
+        // The transaction rolled back: the template is retried on the next run.
         this.logger.warn(
           `Template ${template.id} failed: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
     return created;
+  }
+
+  private inTransaction<T>(
+    context: JobContext | undefined,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return context
+      ? context.runFenced(work)
+      : this.prisma.$transaction(work, { timeout: 30_000 });
   }
 }

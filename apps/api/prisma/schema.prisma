@@ -834,6 +834,9 @@ model SalesDocument {
   projectId          String?             @db.Uuid
   sourceQuoteId      String?             @db.Uuid
   creditedInvoiceId  String?             @db.Uuid
+  /// Set when a recurring template created this document (idempotency key with recurrenceDate).
+  recurringInvoiceId String?             @db.Uuid
+  recurrenceDate     DateTime?           @db.Date
   creditedCents      Int                 @default(0)
   issueDate          DateTime            @db.Date
   dueDate            DateTime?           @db.Date
@@ -857,12 +860,14 @@ model SalesDocument {
   invoices           SalesDocument[]     @relation("QuoteToInvoice")
   creditedInvoice    SalesDocument?      @relation("InvoiceCredits", fields: [creditedInvoiceId], references: [id], onDelete: Restrict)
   creditNotes        SalesDocument[]     @relation("InvoiceCredits")
+  recurringInvoice   RecurringInvoice?   @relation(fields: [recurringInvoiceId], references: [id], onDelete: SetNull)
   timeEntries        TimeEntry[]
   bankTransactions   BankTransaction[]
   createdBy          User?               @relation("SalesDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
   items              SalesDocumentItem[]
 
   @@unique([organizationId, number])
+  @@unique([recurringInvoiceId, recurrenceDate])
   @@index([organizationId, type, status])
   @@index([organizationId, type, issueDate])
   @@index([customerId])
@@ -1157,6 +1162,7 @@ model RecurringInvoice {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
   project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  documents      SalesDocument[]
 
   @@index([organizationId, active, nextRunDate])
   @@map("recurring_invoices")

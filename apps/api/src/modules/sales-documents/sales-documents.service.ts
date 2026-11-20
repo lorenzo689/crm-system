@@ -109,12 +109,18 @@ export class SalesDocumentsService {
     organizationId: string,
     actorUserId: string,
     dto: CreateSalesDocumentDto,
+    options: {
+      /** Create inside the caller's transaction (activity is logged by the caller afterwards). */
+      tx?: Prisma.TransactionClient;
+      /** Idempotency key of documents created by a recurring template. */
+      recurrence?: { recurringInvoiceId: string; recurrenceDate: Date };
+    } = {},
   ) {
     await this.assertReferences(organizationId, dto.customerId, dto.projectId);
     const items = await this.buildItems(organizationId, dto.items);
     const termDays = await this.paymentTermDays(organizationId);
 
-    const created = await this.prisma.salesDocument.create({
+    const created = await (options.tx ?? this.prisma).salesDocument.create({
       data: {
         organizationId,
         type: dto.type,
@@ -131,14 +137,28 @@ export class SalesDocumentsService {
         headerText: dto.headerText,
         footerText: dto.footerText,
         createdById: actorUserId,
+        ...(options.recurrence && {
+          recurringInvoiceId: options.recurrence.recurringInvoiceId,
+          recurrenceDate: options.recurrence.recurrenceDate,
+        }),
         ...items.totals,
         items: { create: items.rows },
       },
       include: detailInclude,
     });
 
-    await this.logActivity(created, actorUserId, 'CREATED');
+    if (!options.tx) {
+      await this.logActivity(created, actorUserId, 'CREATED');
+    }
     return created;
+  }
+
+  /** Activity entry for a document created with `create(..., { tx })`, after commit. */
+  async logCreated(
+    document: { type: SalesDocumentType; number: string; customerId: string },
+    actorUserId: string,
+  ) {
+    await this.logActivity(document, actorUserId, 'CREATED');
   }
 
   async update(
