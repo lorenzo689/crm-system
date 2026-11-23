@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -187,6 +188,19 @@ export class SalesDocumentsService {
       : null;
 
     return this.prisma.$transaction(async (tx) => {
+      // The DRAFT check above is not enough on its own: the document may be
+      // issued in the meantime. This conditional write takes the row lock and
+      // only matches a document that is still a draft (the same claim that
+      // changeStatus uses), so an issued document is never edited.
+      const stillDraft = await tx.salesDocument.updateMany({
+        where: { id, organizationId, status: 'DRAFT' },
+        data: { status: 'DRAFT' },
+      });
+      if (stillDraft.count === 0) {
+        throw new ConflictException(
+          'Der Beleg wurde zwischenzeitlich geändert. Bitte neu laden und erneut prüfen.',
+        );
+      }
       if (items) {
         await tx.salesDocumentItem.deleteMany({
           where: { salesDocumentId: id },
@@ -228,7 +242,30 @@ export class SalesDocumentsService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const data: Prisma.SalesDocumentUncheckedUpdateInput = { status };
+      // Claim the transition first: the status only changes if it is still the
+      // one checked above. The UPDATE locks the row, so a concurrent request
+      // for the same document waits here and then matches no row (READ
+      // COMMITTED re-checks the WHERE clause after the lock is released).
+      // Everything below (number, stock, credit, payment) therefore runs at
+      // most once per transition and rolls back together with the claim.
+      const claimed = await tx.salesDocument.updateMany({
+        where: { id, organizationId, status: document.status },
+        data: { status },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictException(
+          'Der Beleg wurde zwischenzeitlich geändert. Bitte neu laden und erneut prüfen.',
+        );
+      }
+
+      // Read the document again under the row lock: items and amounts may
+      // have changed (e.g. a draft edit that committed) since the read above.
+      const current = await tx.salesDocument.findUniqueOrThrow({
+        where: { id },
+        include: { items: true },
+      });
+
+      const data: Prisma.SalesDocumentUncheckedUpdateInput = {};
 
       // Numbers are assigned on issue so cancelled drafts never leave gaps.
       if (document.status === 'DRAFT' && status === 'SENT') {
@@ -236,23 +273,23 @@ export class SalesDocumentsService {
           tx,
           organizationId,
           document.type,
-          document.issueDate,
+          current.issueDate,
         );
         if (document.type === 'INVOICE') {
-          await this.adjustStock(tx, document.items, -1);
+          await this.adjustStock(tx, current.items, -1);
         }
-        if (document.type === 'CREDIT_NOTE' && document.creditedInvoiceId) {
+        if (document.type === 'CREDIT_NOTE' && current.creditedInvoiceId) {
           await this.applyCreditNote(
             tx,
-            document.creditedInvoiceId,
-            document.grossCents,
+            current.creditedInvoiceId,
+            current.grossCents,
           );
         }
       }
       if (status === 'PAID') {
         data.paidAt = new Date();
         const outstanding =
-          document.grossCents - document.paidCents - document.creditedCents;
+          current.grossCents - current.paidCents - current.creditedCents;
         if (outstanding > 0) {
           await tx.payment.create({
             data: {
@@ -262,7 +299,7 @@ export class SalesDocumentsService {
               createdById: actorUserId,
             },
           });
-          data.paidCents = document.paidCents + outstanding;
+          data.paidCents = current.paidCents + outstanding;
         }
       }
       if (
@@ -270,7 +307,7 @@ export class SalesDocumentsService {
         document.status === 'SENT' &&
         status === 'CANCELLED'
       ) {
-        await this.adjustStock(tx, document.items, 1);
+        await this.adjustStock(tx, current.items, 1);
       }
 
       return tx.salesDocument.update({
