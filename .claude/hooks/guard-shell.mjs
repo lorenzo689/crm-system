@@ -77,7 +77,9 @@ if (/\bgit\s+commit\b/.test(command)) {
       .split(/\r?\n/)
       .filter(Boolean);
   } catch {
-    staged = []; // not a repository: nothing staged to protect
+    // Fail closed: if the staged files cannot be listed (git missing, not a
+    // repository, timeout, broken index), they cannot be checked either.
+    block("the staged files could not be checked (git diff --cached failed)");
   }
   for (const path of staged) {
     for (const [pattern, what] of FORBIDDEN_STAGED) {
