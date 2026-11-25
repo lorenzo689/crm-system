@@ -739,7 +739,18 @@ export class SalesDocumentsService {
     if (document.status !== 'DRAFT') {
       throw new BadRequestException('Only drafts can be deleted');
     }
-    await this.prisma.salesDocument.delete({ where: { id } });
+    // The check above may be outdated: the document can be issued in the
+    // meantime. Delete only if it is still a draft; the DELETE takes the row
+    // lock and waits for a running issue, then matches no row. An issued
+    // (numbered) document is therefore never deleted.
+    const deleted = await this.prisma.salesDocument.deleteMany({
+      where: { id, organizationId, status: 'DRAFT' },
+    });
+    if (deleted.count === 0) {
+      throw new ConflictException(
+        'Der Beleg wurde zwischenzeitlich geändert. Bitte neu laden und erneut prüfen.',
+      );
+    }
     return { deleted: true };
   }
 
