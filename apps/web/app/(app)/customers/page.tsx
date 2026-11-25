@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/auth-api";
 import { CustomerDetailSheet } from "./_components/customer-detail-sheet";
@@ -96,10 +96,9 @@ export default function CustomersPage() {
       });
   }, [router, searchParams]);
 
-  function reloadCustomers(focusCustomerId?: string) {
-    setIsLoading(true);
-    setError(null);
-    apiFetch<Customer[]>("/customers")
+  /** State is only written in the request callbacks (safe inside effects). */
+  const fetchCustomers = useCallback((focusCustomerId?: string) => {
+    return apiFetch<Customer[]>("/customers")
       .then((loadedCustomers) => {
         setCustomers(loadedCustomers);
         if (focusCustomerId) {
@@ -114,11 +113,18 @@ export default function CustomersPage() {
         );
       })
       .finally(() => setIsLoading(false));
+  }, []);
+
+  function reloadCustomers(focusCustomerId?: string) {
+    setIsLoading(true);
+    setError(null);
+    void fetchCustomers(focusCustomerId);
   }
 
+  // Initial load; isLoading starts as true, so nothing needs resetting here.
   useEffect(() => {
-    reloadCustomers();
-  }, []);
+    void fetchCustomers();
+  }, [fetchCustomers]);
 
   const selectedCustomer = useMemo(
     () =>

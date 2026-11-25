@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
-import { logout } from "@/lib/session";
+import { useLogout } from "@/lib/use-logout";
 import {
   getUserInitials,
   organizationRoleLabels,
@@ -13,6 +13,7 @@ import {
 export function ProfileMenu() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const { logout, isPending: isLoggingOut, error: logoutError } = useLogout();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -94,11 +95,17 @@ export function ProfileMenu() {
           <button
             type="button"
             role="menuitem"
-            onClick={() => logout()}
-            className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+            onClick={() => void logout()}
+            disabled={isLoggingOut}
+            className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
-            Abmelden
+            {isLoggingOut ? "Wird abgemeldet…" : "Abmelden"}
           </button>
+          {logoutError && (
+            <p role="alert" className="px-4 pb-2 text-xs text-red-600">
+              {logoutError}
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -11,6 +11,8 @@ import {
   FiArrowRight,
 } from "react-icons/fi";
 import { useEffect, useState } from "react";
+import { FinanceOverview } from "@/components/finance-overview";
+import { useCurrentUser } from "@/lib/use-current-user";
 import { apiFetch } from "@/lib/auth-api";
 import type { CurrentUser } from "@/lib/user-profile";
 
@@ -68,6 +70,7 @@ function formatDateTime(value: string) {
 }
 
 export function DashboardContent() {
+  const { isAdmin } = useCurrentUser();
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -165,6 +168,7 @@ export function DashboardContent() {
           </strong>
         </div>
       </div>
+      {isAdmin && <FinanceOverview />}
       <div className="dashboard-kpis">
         {kpiItems.map((item, index) => {
           const Icon = icons[index];

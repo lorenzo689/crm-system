@@ -1,5 +1,5 @@
-import { apiFetch } from "@/lib/auth-api";
-import { ACCESS_TOKEN_KEY } from "@/lib/session";
+import { apiFetch, apiFetchRaw } from "@/lib/auth-api";
+import { SessionChangedError, getContextEpoch } from "@/lib/session";
 
 export type DocumentType =
   | "GENERAL"
@@ -97,24 +97,17 @@ export async function uploadDocumentVersion(
   const formData = new FormData();
   formData.append("file", file);
 
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
-
-  const response = await fetch(`${apiUrl}/documents/${documentId}/versions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      message?: string | string[];
-    } | null;
-    const message = Array.isArray(body?.message)
-      ? body.message.join(" ")
-      : body?.message;
-    throw new Error(translateUploadError(message));
+  // apiFetch sends the session cookie and CSRF token and leaves the
+  // multipart Content-Type to the browser.
+  try {
+    await apiFetch(`/documents/${documentId}/versions`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (error) {
+    throw new Error(
+      translateUploadError(error instanceof Error ? error.message : undefined),
+    );
   }
 }
 
@@ -122,38 +115,83 @@ export type DocumentDetail = DocumentListItem & {
   versions: DocumentVersion[];
 };
 
-/** Signed URL; `inline` is for previews, `attachment` forces a file download. */
-export async function getDocumentUrl(
+/**
+ * Loads a document through the session-bound client (never through a plain
+ * URL the browser would fetch on its own): the request carries the session
+ * context, is aborted when the context changes, and the bytes are only handed
+ * out if the context was still the same after the LAST byte arrived.
+ * `inline` is for previews (PDF/images only), `attachment` for downloads.
+ */
+export async function fetchDocumentBlob(
   documentId: string,
   options: {
-    signal?: AbortSignal;
     disposition?: "inline" | "attachment";
     versionId?: string;
+    signal?: AbortSignal;
   } = {},
-): Promise<string> {
+): Promise<{ blob: Blob; fileName: string | null }> {
   const params = new URLSearchParams();
   params.set("disposition", options.disposition ?? "inline");
   if (options.versionId) params.set("version", options.versionId);
+  const startedIn = getContextEpoch();
+  let blob: Blob;
+  let fileName: string | null;
+  try {
+    const response = await apiFetchRaw(
+      `/documents/${encodeURIComponent(documentId)}/download?${params.toString()}`,
+      { signal: options.signal },
+    );
+    fileName = fileNameFromDisposition(response.headers.get("Content-Disposition"));
+    blob = await response.blob();
+    if (options.disposition !== "attachment" && !isPreviewableType(blob.type)) {
+      throw new Error("Für diesen Dateityp ist keine Vorschau verfügbar.");
+    }
+  } catch (error) {
+    if (getContextEpoch() !== startedIn) throw new SessionChangedError();
+    throw error;
+  }
+  if (getContextEpoch() !== startedIn) throw new SessionChangedError();
+  return { blob, fileName };
+}
 
-  const { url } = await apiFetch<{ url: string }>(
-    `/documents/${documentId}/download-url?${params.toString()}`,
-    { signal: options.signal },
-  );
-  return url;
+/**
+ * Only these types may be shown inline from a blob: URL. A blob: URL belongs to
+ * this origin, so anything that could run script (HTML, SVG, XML) must never
+ * be rendered from one, whatever the server claims.
+ */
+export function isPreviewableType(mimeType: string): boolean {
+  return /^(application\/pdf|image\/(png|jpeg|gif|webp))(;|$)/i.test(mimeType);
+}
+
+export function fileNameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded[1]);
+    } catch {
+      return null;
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain ? plain[1] : null;
 }
 
 export async function openDocumentDownload(
   documentId: string,
   versionId?: string,
 ): Promise<void> {
-  const url = await getDocumentUrl(documentId, {
+  const { blob, fileName } = await fetchDocumentBlob(documentId, {
     disposition: "attachment",
     versionId,
   });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
+  link.download = fileName ?? "dokument";
   link.rel = "noopener";
   link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 export function archiveDocument(documentId: string) {

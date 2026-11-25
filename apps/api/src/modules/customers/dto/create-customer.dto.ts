@@ -1,5 +1,11 @@
 import { CustomerStatus } from '../../../../generated/prisma/enums';
-import { IsEnum, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -11,7 +17,7 @@ export class CreateCustomerDto {
   customerNumber!: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   website?: string;
 
   @IsOptional()

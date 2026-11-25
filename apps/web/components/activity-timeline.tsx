@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/auth-api";
+import { useApiResource } from "@/lib/use-api-resource";
 
 type ActivityType =
   | "CUSTOMER_CREATED"
@@ -79,19 +78,11 @@ function groupByDay(activities: Activity[]) {
 }
 
 export function ActivityTimeline({ contextParam, contextId }: ActivityTimelineProps) {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setIsLoading(true);
-    setError(null);
-
-    apiFetch<Activity[]>(`/activities?${contextParam}=${contextId}`)
-      .then(setActivities)
-      .catch((err) => setError(err instanceof Error ? err.message : "Fehler beim Laden"))
-      .finally(() => setIsLoading(false));
-  }, [contextParam, contextId]);
+  const { data, isLoading, error } = useApiResource<Activity[]>(
+    `/activities?${contextParam}=${contextId}`,
+    "Fehler beim Laden",
+  );
+  const activities = data ?? [];
 
   if (isLoading) return <p className="text-sm text-zinc-400">Lädt…</p>;
   if (error) return <p className="text-sm text-red-600">{error}</p>;

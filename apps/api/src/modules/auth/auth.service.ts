@@ -1,29 +1,44 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  InternalServerErrorException,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ACCOUNT_STATE_SELECT, getUsableMembership } from './account-status';
 import { AuthMailService } from './auth-mail.service';
+import { JWT_ALGORITHMS } from './auth-config';
+import { CsrfTokenException, csrfTokenFor, isValidCsrfToken } from './csrf';
+import { sessionContextFor } from './session-context';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SessionService, type SessionClaims } from './session.service';
+import type { AuthUser } from './strategies/jwt.strategies';
 
-const BISSINGER_ORG_SLUG = 'bissinger-lights';
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
+const MAIL_SEND_TIMEOUT_MS = 8000;
+const RESET_RESPONSE_MESSAGE =
+  'Wenn ein Konto mit dieser E-Mail existiert, wurde ein Reset-Link vorbereitet.';
+
+/** Minimum duration of every forgot-password answer (hides the mail-sending work). */
+function getPasswordResetMinResponseMs() {
+  const configured = Number(process.env.PASSWORD_RESET_MIN_RESPONSE_MS);
+  return Number.isFinite(configured) && configured >= 0 ? configured : 1500;
+}
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync(
   'not-the-right-password',
   SALT_ROUNDS,
 );
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 @Injectable()
 export class AuthService {
@@ -33,70 +48,177 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly authMailService: AuthMailService,
+    private readonly sessions: SessionService,
   ) {}
 
-  async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-    if (existing) {
-      throw new ConflictException('E-Mail wird bereits verwendet');
-    }
-
-    const organization = await this.prisma.organization.findUnique({
-      where: { slug: BISSINGER_ORG_SLUG },
-    });
-    if (!organization) {
-      throw new InternalServerErrorException(
-        `Basis-Organisation "${BISSINGER_ORG_SLUG}" ist nicht eingerichtet. Bitte zuerst das Setup-Skript ausf\u00fchren (siehe README).`,
-      );
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        displayName: dto.displayName,
-        passwordHash,
-        organizationRoles: {
-          create: {
-            organizationId: organization.id,
-            role: 'MEMBER',
-          },
-        },
-      },
+  /**
+   * Verifies credentials and opens a brand-new server-side session. A session
+   * cookie the browser already presented is revoked rather than reused, so a
+   * planted (fixated) session can never become the authenticated one.
+   */
+  async login(dto: LoginDto, presentedCookie: string | null) {
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: dto.email.trim(), mode: 'insensitive' } },
+      select: ACCOUNT_STATE_SELECT,
     });
 
-    return this.buildAuthResponse(user.id, user.email);
-  }
-
-  async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-
+    // Always run bcrypt so response time does not reveal whether the account exists.
     const passwordHash = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
     const isValid = await bcrypt.compare(dto.password, passwordHash);
 
-    if (!user || !user.passwordHash || !isValid) {
+    // One message for every failure (unknown account, wrong password, locked
+    // account, suspended organization) so nothing is revealed to the caller.
+    if (!user || !user.passwordHash || !isValid || !getUsableMembership(user)) {
       throw new UnauthorizedException('E-Mail oder Passwort falsch');
     }
 
-    return this.buildAuthResponse(user.id, user.email);
+    const previous = this.verifySessionCookie(presentedCookie);
+    if (previous) {
+      await this.sessions.revoke(previous.sid);
+    }
+
+    const issued = await this.sessions.create(user);
+    const membership = getUsableMembership(user);
+    return {
+      issued,
+      body: await this.describeSession(
+        user.id,
+        issued.sessionId,
+        issued.expiresAt,
+        membership?.role,
+        membership?.organizationId,
+      ),
+    };
   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-      select: { id: true, email: true },
-    });
+  /** What the browser may know about its session. Never the session secret. */
+  async getSession(authUser: AuthUser) {
+    return this.describeSession(
+      authUser.sub,
+      authUser.sessionId,
+      authUser.sessionExpiresAt,
+      authUser.role,
+      authUser.organizationId,
+    );
+  }
 
-    if (!user) {
-      return {
-        message:
-          'Wenn ein Konto mit dieser E-Mail existiert, wurde ein Reset-Link vorbereitet.',
-      };
+  /**
+   * Ends the session of this browser only. Without a usable session there is
+   * nothing to revoke and the caller just gets its cookie cleared; with one,
+   * the CSRF token is mandatory so a foreign site cannot log users out.
+   */
+  async logout(
+    presentedCookie: string | null,
+    csrfHeader: string | string[] | undefined,
+  ) {
+    const claims = this.verifySessionCookie(presentedCookie);
+    const session = claims ? await this.sessions.findActive(claims) : null;
+    if (!session) {
+      return { revoked: false };
+    }
+    if (!isValidCsrfToken(session.id, csrfHeader)) {
+      throw new CsrfTokenException();
+    }
+    await this.sessions.revoke(session.id);
+    return { revoked: true };
+  }
+
+  private verifySessionCookie(cookie: string | null): SessionClaims | null {
+    if (!cookie) {
+      return null;
+    }
+    try {
+      const claims = this.jwtService.verify<Partial<SessionClaims>>(cookie, {
+        algorithms: [...JWT_ALGORITHMS],
+      });
+      return typeof claims.sid === 'string' &&
+        typeof claims.sub === 'string' &&
+        typeof claims.jti === 'string' &&
+        typeof claims.tv === 'number'
+        ? (claims as SessionClaims)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async describeSession(
+    userId: string,
+    sessionId: string,
+    expiresAt: Date,
+    role: string | undefined,
+    organizationId: string | undefined,
+  ) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        organizationRoles: {
+          orderBy: { joinedAt: 'asc' },
+          take: 1,
+          select: { organization: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    const organization = user.organizationRoles[0]?.organization ?? null;
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+      },
+      organization,
+      role: role ?? null,
+      csrfToken: csrfTokenFor(sessionId),
+      // Same value the guard puts into X-Session-Context for this session.
+      contextId: sessionContextFor({
+        sessionId,
+        userId: user.id,
+        organizationId: organizationId ?? '',
+        role: role ?? '',
+      }),
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  /**
+   * Always answers the same way (status and body), whether or not the address
+   * belongs to an account, and whether or not mail delivery works. Delivery is
+   * attempted inside the request (no unreliable work after the response), its
+   * failures are logged without token or link, and the response time is padded
+   * to a minimum so the extra work for real accounts is not observable.
+   */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const startedAt = Date.now();
+    try {
+      await this.issueResetMail(dto.email);
+    } catch (error) {
+      // Never reveal delivery problems to the caller and never log the link.
+      this.logger.error(
+        `Passwort-Reset konnte nicht zugestellt werden (${
+          error instanceof Error ? error.name : 'unbekannter Fehler'
+        })`,
+      );
+    }
+
+    const minimumMs = getPasswordResetMinResponseMs();
+    const remaining = minimumMs - (Date.now() - startedAt);
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
+
+    return { message: RESET_RESPONSE_MESSAGE };
+  }
+
+  private async issueResetMail(emailInput: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: emailInput.trim(), mode: 'insensitive' } },
+      select: { id: true, email: true, archivedAt: true },
+    });
+    if (!user || user.archivedAt) {
+      return;
     }
 
     const token = randomBytes(PASSWORD_RESET_TOKEN_BYTES).toString('hex');
@@ -105,107 +227,97 @@ export class AuthService {
 
     await this.prisma.$transaction([
       this.prisma.passwordResetToken.updateMany({
-        where: {
-          userId: user.id,
-          usedAt: null,
-        },
-        data: {
-          usedAt: now,
-        },
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: now },
       }),
       this.prisma.passwordResetToken.create({
-        data: {
-          userId: user.id,
-          token,
-          expiresAt,
-        },
+        data: { userId: user.id, token: hashToken(token), expiresAt },
       }),
     ]);
 
     const resetUrl = this.buildPasswordResetUrl(token);
-    const response: {
-      message: string;
-      resetToken?: string;
-      resetUrl?: string;
-      expiresAt?: string;
-    } = {
-      message:
-        'Wenn ein Konto mit dieser E-Mail existiert, wurde ein Reset-Link vorbereitet.',
-    };
-
-    if (this.authMailService.isConfigured()) {
-      await this.authMailService.sendPasswordReset({
-        email: user.email,
-        resetUrl,
-        expiresAt,
-      });
-    } else if (process.env.NODE_ENV === 'development') {
-      this.logger.warn(
-        `SMTP nicht konfiguriert, Passwort-Reset-Link wird nur lokal bereitgestellt: ${resetUrl}`,
-      );
-      response.resetToken = token;
-      response.resetUrl = resetUrl;
-      response.expiresAt = expiresAt.toISOString();
-    } else {
-      throw new InternalServerErrorException(
-        'Passwort-Reset-Mailversand ist nicht konfiguriert.',
-      );
+    if (!this.authMailService.isConfigured()) {
+      if (process.env.NODE_ENV === 'development') {
+        // Local convenience only; production refuses to start without SMTP.
+        this.logger.warn(
+          `SMTP nicht konfiguriert, Reset-Link nur lokal im Log: ${resetUrl}`,
+        );
+        return;
+      }
+      throw new Error('SMTP nicht konfiguriert');
     }
 
-    return response;
+    const delivery = { email: user.email, resetUrl, expiresAt };
+    try {
+      await this.sendWithTimeout(delivery);
+    } catch {
+      // One retry covers a transient SMTP hiccup.
+      await this.sendWithTimeout(delivery);
+    }
+  }
+
+  private async sendWithTimeout(
+    delivery: Parameters<AuthMailService['sendPasswordReset']>[0],
+  ) {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        this.authMailService.sendPasswordReset(delivery),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('SMTP timeout')),
+            MAIL_SEND_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async resetPassword(dto: ResetPasswordDto) {
-    const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { token: dto.token },
-      select: {
-        id: true,
-        userId: true,
-        expiresAt: true,
-        usedAt: true,
-      },
+    const tokenHash = hashToken(dto.token);
+    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+    const now = new Date();
+
+    const reset = await this.prisma.$transaction(async (tx) => {
+      // Consuming the token is a single conditional UPDATE, so two parallel
+      // requests with the same link cannot both succeed.
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: { token: tokenHash, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+      if (consumed.count !== 1) {
+        return false;
+      }
+
+      const token = await tx.passwordResetToken.findUniqueOrThrow({
+        where: { token: tokenHash },
+        select: { userId: true },
+      });
+      await tx.user.update({
+        where: { id: token.userId },
+        // Every session ends: the rows are revoked and the bumped tokenVersion
+        // rejects any cookie issued before the reset as a second barrier.
+        data: { passwordHash, tokenVersion: { increment: 1 } },
+      });
+      await this.sessions.revokeAllForUser(token.userId, tx);
+      await tx.passwordResetToken.updateMany({
+        where: { userId: token.userId, usedAt: null },
+        data: { usedAt: now },
+      });
+      return true;
     });
 
-    if (
-      !resetToken ||
-      resetToken.usedAt ||
-      resetToken.expiresAt.getTime() <= Date.now()
-    ) {
+    if (!reset) {
       throw new BadRequestException(
-        'Reset-Link ist ung\u00fcltig oder bereits abgelaufen',
+        'Reset-Link ist ungültig oder bereits abgelaufen',
       );
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const usedAt = new Date();
-
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: resetToken.userId },
-        data: { passwordHash },
-      }),
-      this.prisma.passwordResetToken.update({
-        where: { id: resetToken.id },
-        data: { usedAt },
-      }),
-      this.prisma.passwordResetToken.updateMany({
-        where: {
-          userId: resetToken.userId,
-          usedAt: null,
-          id: { not: resetToken.id },
-        },
-        data: { usedAt },
-      }),
-    ]);
-
     return {
-      message: 'Passwort wurde erfolgreich zur\u00fcckgesetzt',
+      message: 'Passwort wurde erfolgreich zurückgesetzt',
     };
-  }
-
-  private buildAuthResponse(userId: string, email: string) {
-    const accessToken = this.jwtService.sign({ sub: userId, email });
-    return { accessToken };
   }
 
   private buildPasswordResetUrl(token: string) {

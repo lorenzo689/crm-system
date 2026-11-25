@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The workflow only reads the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.11-alpine
+        env:
+          POSTGRES_USER: bissinger
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: bissinger_os
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bissinger"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://bissinger:ci@localhost:5432/bissinger_os
+      NODE_ENV: test
+      JWT_SECRET: ci-only-secret-with-at-least-thirty-two-chars
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations and generate the Prisma client
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy && pnpm exec prisma generate
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Security integration tests (isolated *_test database, cookie sessions, CSRF)
+        working-directory: apps/api
+        env:
+          TEST_DATABASE_URL: postgresql://bissinger:ci@localhost:5432/bissinger_os_test
+        run: |
+          PGPASSWORD=ci psql -h localhost -U bissinger -d postgres -c 'CREATE DATABASE bissinger_os_test'
+          DATABASE_URL="$TEST_DATABASE_URL" pnpm exec prisma migrate deploy
+          pnpm test:e2e
+      - name: Build
+        run: pnpm build
+      - name: Lint (API and web, mandatory)
+        run: pnpm lint
+
+  # Container images and the private staging stack, end to end, with
+  # synthetic data and random throw-away secrets. No external services.
+  infrastructure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      API_IMAGE: bissinger-os/api:ci
+      WEB_IMAGE: bissinger-os/web:ci
+      MIGRATE_IMAGE: bissinger-os/migrate:ci
+      BACKUP_IMAGE: bissinger-os/backup:ci
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Build API, migration, web and backup images
+        run: |
+          docker build -f infrastructure/docker/api.Dockerfile --target runtime -t "$API_IMAGE" .
+          docker build -f infrastructure/docker/api.Dockerfile --target migrate -t "$MIGRATE_IMAGE" .
+          docker build -f infrastructure/docker/web.Dockerfile -t "$WEB_IMAGE" .
+          docker build -f infrastructure/docker/backup.Dockerfile -t "$BACKUP_IMAGE" .
+      - name: Images run as non-root and contain no .env files
+        run: |
+          for image in "$API_IMAGE" "$WEB_IMAGE" "$MIGRATE_IMAGE"; do
+            test "$(docker run --rm --entrypoint id "$image" -u)" != 0
+            test -z "$(docker run --rm --entrypoint sh "$image" -c 'find / -name ".env" -not -path "/proc/*" 2>/dev/null')"
+          done
+      - name: Backup permission regression test (uid 70 files stay 0600, unprivileged users are refused)
+        run: bash infrastructure/tests/permissions-test.sh
+      - name: Staging smoke test (proxy, HTTPS origin, cookies, CSRF, documents, jobs, ports, readiness, backup, persistence)
+        run: bash infrastructure/tests/staging-smoke.sh
+      - name: Backup and restore test (fresh environment, hashes, migrations)
+        run: bash infrastructure/tests/restore-test.sh
+      - name: Restore report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: restore-report
+          path: infrastructure/docker/.staging-test/restore-report.md
+          if-no-files-found: ignore

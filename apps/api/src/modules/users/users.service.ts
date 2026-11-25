@@ -41,7 +41,8 @@ export class UsersService {
       throw new ForbiddenException('User has no organization membership');
     }
 
-    const { organizationRoles: _organizationRoles, ...profile } = user;
+    const { organizationRoles, ...profile } = user;
+    void organizationRoles; // replaced by the flattened fields below
     return {
       ...profile,
       organizationName: membership.organization.name,
@@ -50,15 +51,29 @@ export class UsersService {
   }
 
   async getOrganizationId(userId: string): Promise<string> {
+    return (await this.getMembership(userId)).organizationId;
+  }
+
+  /** Always read from the database so role and membership changes apply immediately. */
+  async getMembership(userId: string) {
     const membership = await this.prisma.organizationMember.findFirst({
       where: { userId },
-      select: { organizationId: true },
+      orderBy: { joinedAt: 'asc' },
+      select: { organizationId: true, role: true },
     });
 
     if (!membership) {
       throw new ForbiddenException('User has no organization membership');
     }
+    return membership;
+  }
 
+  /** Throws unless the user is an owner or admin of their organization. */
+  async assertAdmin(userId: string) {
+    const membership = await this.getMembership(userId);
+    if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+      throw new ForbiddenException('Administrator rights required');
+    }
     return membership.organizationId;
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import type { CurrentUser } from "@/lib/user-profile";
 
 export type ProjectMember = {
   userId: string;
@@ -42,6 +43,18 @@ export function ProjectTeam({
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedRole, setSelectedRole] = useState("CONTRIBUTOR");
   const [isAdding, setIsAdding] = useState(false);
+  // Hiding the controls is only a convenience; the API enforces this itself.
+  const [canManage, setCanManage] = useState(false);
+
+  useEffect(() => {
+    apiFetch<CurrentUser>("/users/me")
+      .then((me) =>
+        setCanManage(
+          me.organizationRole === "OWNER" || me.organizationRole === "ADMIN",
+        ),
+      )
+      .catch(() => setCanManage(false));
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -185,6 +198,7 @@ export function ProjectTeam({
                 <div className="flex items-center gap-2">
                   <select
                     value={member.role}
+                    disabled={!canManage}
                     onChange={(event) =>
                       handleRoleChange(member.userId, event.target.value)
                     }
@@ -196,13 +210,15 @@ export function ProjectTeam({
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(member.userId)}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Entfernen
-                  </button>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(member.userId)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Entfernen
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -211,7 +227,7 @@ export function ProjectTeam({
       </div>
 
       <div className="mt-3">
-        {isLoadingUsers ? (
+        {!canManage ? null : isLoadingUsers ? (
           <p className="text-sm text-zinc-500">Benutzer werden geladen...</p>
         ) : availableUsers.length === 0 ? (
           <p className="text-sm text-zinc-500">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import {
   priorityLabels,
@@ -68,42 +68,28 @@ function toDateInputValue(isoString: string | null): string {
   return isoString.slice(0, 10);
 }
 
-export function ProjectFormModal({
-  isOpen,
+function ProjectFormModalContent({
   project,
   customers,
   onClose,
   onSaved,
 }: ProjectFormModalProps) {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [formState, setFormState] = useState<FormState>(() =>
+    project
+      ? {
+          customerId: project.customer.id,
+          name: project.name,
+          projectNumber: project.projectNumber,
+          status: project.status,
+          priority: project.priority,
+          description: project.description ?? "",
+          startsAt: toDateInputValue(project.startsAt),
+          endsAt: toDateInputValue(project.endsAt),
+        }
+      : initialFormState,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    if (project) {
-      setFormState({
-        customerId: project.customer.id,
-        name: project.name,
-        projectNumber: project.projectNumber,
-        status: project.status,
-        priority: project.priority,
-        description: project.description ?? "",
-        startsAt: toDateInputValue(project.startsAt),
-        endsAt: toDateInputValue(project.endsAt),
-      });
-    } else {
-      setFormState(initialFormState);
-    }
-    setError(null);
-  }, [isOpen, project]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -342,4 +328,15 @@ export function ProjectFormModal({
       </div>
     </div>
   );
+}
+
+/**
+ * Mounted only while open (and re-keyed per record), so every opening starts
+ * from fresh form state without an effect that resets it.
+ */
+export function ProjectFormModal(props: ProjectFormModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+  return <ProjectFormModalContent key={props.project?.id ?? "new"} {...props} />;
 }

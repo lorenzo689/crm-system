@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -27,7 +28,7 @@ export class ContactsController {
 
   @Get()
   async findAllByCustomer(
-    @Query('customerId') customerId: string,
+    @Query('customerId', ParseUUIDPipe) customerId: string,
     @Req() req: Request,
   ) {
     const payload = req.user as JwtPayload;
@@ -38,7 +39,7 @@ export class ContactsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -57,7 +58,7 @@ export class ContactsController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateContactDto,
     @Req() req: Request,
   ) {
@@ -69,7 +70,7 @@ export class ContactsController {
   }
 
   @Post(':id/archive')
-  async archive(@Param('id') id: string, @Req() req: Request) {
+  async archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -78,7 +79,7 @@ export class ContactsController {
   }
 
   @Post(':id/unarchive')
-  async unarchive(@Param('id') id: string, @Req() req: Request) {
+  async unarchive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,

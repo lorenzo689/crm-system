@@ -1,0 +1,31 @@
+# Build context = repository root. Allowlist: nothing enters an image unless
+# listed here, and secrets (.env files), dependencies and build output never do.
+**
+
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!turbo.json
+!packages/**
+!apps/api/**
+!apps/web/**
+!infrastructure/docker/backup/**
+
+# Never in any build context, even inside allowed folders.
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/dist-*
+**/generated
+**/coverage
+**/*.log
+**/tsconfig.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/apps
+apps/api/test
+apps/web/test
+apps/web/AGENTS.md
+**/.DS_Store

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useApiResource } from "@/lib/use-api-resource";
 
 type NoteType = "GENERAL" | "PHONE" | "MEETING" | "INTERNAL" | "DECISION";
 
@@ -41,30 +42,20 @@ const noteTypeStyles: Record<NoteType, string> = {
 };
 
 export function NotesSection({ contextParam, contextId, isOpen = true }: NotesSectionProps) {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    data,
+    error,
+    isLoading,
+    setData: setNotes,
+    setError,
+  } = useApiResource<Note[]>(
+    isOpen ? `/notes?${contextParam}=${contextId}` : null,
+    "Notizen konnten nicht geladen werden.",
+  );
+  const notes = data ?? [];
   const [newNoteContent, setNewNoteContent] = useState("");
   const [newNoteType, setNewNoteType] = useState<NoteType>("GENERAL");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    apiFetch<Note[]>(`/notes?${contextParam}=${contextId}`)
-      .then(setNotes)
-      .catch((caughtError) => {
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Notizen konnten nicht geladen werden.",
-        );
-      })
-      .finally(() => setIsLoading(false));
-  }, [contextParam, contextId, isOpen]);
 
   async function handleAddNote(event: React.FormEvent) {
     event.preventDefault();
