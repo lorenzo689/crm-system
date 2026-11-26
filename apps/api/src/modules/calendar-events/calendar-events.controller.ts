@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import type { CalendarEventStatus } from '../../../generated/prisma/client';
+import { ProjectWrite, ProjectWriteGuard } from '../access/project-write.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
 import type { JwtPayload } from '../auth/strategies/jwt.strategies';
 import { UsersService } from '../users/users.service';
@@ -19,7 +21,7 @@ import { CreateCalendarEventDto } from './dto/create-calendar-event.dto';
 import { CreateReminderDto } from './dto/create-reminder.dto';
 import { UpdateCalendarEventDto } from './dto/update-calendar-event.dto';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ProjectWriteGuard)
 @Controller('calendar-events')
 export class CalendarEventsController {
   constructor(
@@ -32,8 +34,10 @@ export class CalendarEventsController {
     @Req() req: Request,
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('customerId') customerId?: string,
-    @Query('projectId') projectId?: string,
+    @Query('customerId', new ParseUUIDPipe({ optional: true }))
+    customerId?: string,
+    @Query('projectId', new ParseUUIDPipe({ optional: true }))
+    projectId?: string,
     @Query('status') status?: CalendarEventStatus,
   ) {
     const payload = req.user as JwtPayload;
@@ -50,7 +54,7 @@ export class CalendarEventsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -58,6 +62,7 @@ export class CalendarEventsController {
     return this.calendarEventsService.findOne(id, organizationId);
   }
 
+  @ProjectWrite({ bodyField: 'projectId' })
   @Post()
   async create(@Body() dto: CreateCalendarEventDto, @Req() req: Request) {
     const payload = req.user as JwtPayload;
@@ -67,9 +72,10 @@ export class CalendarEventsController {
     return this.calendarEventsService.create(organizationId, payload.sub, dto);
   }
 
+  @ProjectWrite({ entity: 'calendarEvent' })
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCalendarEventDto,
     @Req() req: Request,
   ) {
@@ -85,8 +91,9 @@ export class CalendarEventsController {
     );
   }
 
+  @ProjectWrite({ entity: 'calendarEvent' })
   @Post(':id/cancel')
-  async cancel(@Param('id') id: string, @Req() req: Request) {
+  async cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -94,8 +101,9 @@ export class CalendarEventsController {
     return this.calendarEventsService.cancel(id, organizationId, payload.sub);
   }
 
+  @ProjectWrite({ entity: 'calendarEvent' })
   @Post(':id/archive')
-  async archive(@Param('id') id: string, @Req() req: Request) {
+  async archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -105,7 +113,7 @@ export class CalendarEventsController {
 
   @Post(':id/reminders')
   async addReminder(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateReminderDto,
     @Req() req: Request,
   ) {
@@ -122,7 +130,10 @@ export class CalendarEventsController {
   }
 
   @Get(':id/reminders')
-  async findReminders(@Param('id') id: string, @Req() req: Request) {
+  async findReminders(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+  ) {
     const payload = req.user as JwtPayload;
     const organizationId = await this.usersService.getOrganizationId(
       payload.sub,
@@ -136,7 +147,7 @@ export class CalendarEventsController {
 
   @Post('reminders/:reminderId/cancel')
   async cancelReminder(
-    @Param('reminderId') reminderId: string,
+    @Param('reminderId', ParseUUIDPipe) reminderId: string,
     @Req() req: Request,
   ) {
     const payload = req.user as JwtPayload;

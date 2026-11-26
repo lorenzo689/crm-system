@@ -1,67 +1,67 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { FiMenu, FiSearch } from "react-icons/fi";
 import { CreateMenu } from "@/components/layout/create-menu";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { NotificationMenu } from "@/components/layout/notification-menu";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 
 const routeTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
+  "/dashboard": "Übersicht",
   "/customers": "Kunden",
   "/projects": "Projekte",
   "/tasks": "Aufgaben",
   "/calendar": "Kalender",
+  "/time": "Zeiten",
   "/documents": "Dokumente",
+  "/articles": "Artikel",
+  "/quotes": "Angebote",
+  "/invoices": "Rechnungen",
+  "/credit-notes": "Gutschriften",
+  "/recurring": "Abos",
+  "/suppliers": "Lieferanten",
+  "/purchase-orders": "Bestellungen",
+  "/finance": "Finanzen",
+  "/reports": "Auswertungen",
+  "/inbox": "Posteingang",
   "/settings": "Einstellungen",
   "/profile": "Profil",
 };
 
 function getPageTitle(pathname: string) {
-  if (routeTitles[pathname]) {
-    return routeTitles[pathname];
-  }
-
-  const matchedPrefix = Object.keys(routeTitles).find((route) =>
-    pathname.startsWith(`${route}/`),
-  );
-
-  return matchedPrefix ? routeTitles[matchedPrefix] : "Bissinger OS";
+  const matched = Object.keys(routeTitles)
+    .sort((a, b) => b.length - a.length)
+    .find((route) => pathname === route || pathname.startsWith(`${route}/`));
+  return matched ? routeTitles[matched] : "Bissinger OS";
 }
 
-export function AppHeader() {
+export function AppHeader({ onMenuToggle, onSearchOpen }: { onMenuToggle: () => void; onSearchOpen: () => void }) {
   const pathname = usePathname();
   const pageTitle = getPageTitle(pathname);
-  const today = new Date().toLocaleDateString("de-DE", {
-    day: "numeric",
-    month: "long",
-  });
 
   return (
-    <header className="relative z-30 flex shrink-0 items-center justify-between border-b border-zinc-200 bg-[rgba(252,252,251,0.96)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] backdrop-blur md:px-8 md:py-5">
-      <div className="flex min-w-0 items-center gap-3 xl:gap-6">
-        <div className="app-header-title min-w-0">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-zinc-400">
-            Bissinger OS
-          </p>
-          <h1 className="mt-2 truncate text-[1.35rem] font-semibold tracking-[-0.05em] text-zinc-950 sm:text-[1.7rem]">
-            {pageTitle}
-          </h1>
-        </div>
-
-        <GlobalSearch />
-      </div>
-
-      <div className="ml-3 flex shrink-0 items-center gap-2 xl:ml-6 xl:gap-3">
-        <CreateMenu />
-
+    <header className="app-header">
+      <div className="app-header-context">
         <button
           type="button"
-          className="app-header-date hidden h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-50 xl:inline-flex"
+          className="app-mobile-menu"
+          aria-label="Navigation öffnen"
+          onClick={onMenuToggle}
         >
-          Heute, {today}
+          <FiMenu aria-hidden="true" />
         </button>
-
+        <div className="app-header-title">
+          <span>Bissinger OS</span>
+          <strong>{pageTitle}</strong>
+        </div>
+      </div>
+      <div className="app-header-search"><GlobalSearch /></div>
+      <div className="app-header-actions">
+        <button type="button" className="app-mobile-search" aria-label="Suche öffnen" onClick={onSearchOpen}>
+          <FiSearch aria-hidden="true" />
+        </button>
+        <CreateMenu />
         <NotificationMenu />
         <ProfileMenu />
       </div>

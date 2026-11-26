@@ -24,6 +24,7 @@ import {
   NotificationsSection,
   type NotificationSettings,
 } from "./_components/notifications-section";
+import { CompanySection } from "./_components/company-section";
 import { SessionSection } from "./_components/session-section";
 
 type UserSettings = AppearanceSettings &
@@ -38,13 +39,19 @@ type UserSettings = AppearanceSettings &
   };
 
 type SettingsSection =
-  "general" | "appearance" | "notifications" | "behavior" | "session";
+  | "general"
+  | "appearance"
+  | "notifications"
+  | "behavior"
+  | "company"
+  | "session";
 
 const navigationItems = [
   { key: "general", label: "Allgemein", icon: FiSettings },
   { key: "appearance", label: "Darstellung", icon: FiMonitor },
   { key: "notifications", label: "Benachrichtigungen", icon: FiBell },
   { key: "behavior", label: "Verhalten", icon: FiSliders },
+  { key: "company", label: "Firmendaten", icon: FiBriefcase },
   { key: "session", label: "Sitzung", icon: FiLogOut },
 ] as const;
 
@@ -311,6 +318,7 @@ export default function SettingsPage() {
                   onUpdate={updateSettings}
                 />
               )}
+              {activeSection === "company" && <CompanySection />}
               {activeSection === "session" && <SessionSection />}
             </section>
           </div>

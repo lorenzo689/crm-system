@@ -7,3 +7,10 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+# Security fixes for transitive runtime dependencies (see docs/security/sprint-1-auth-hardening.md).
+# Remove once the direct dependencies ship these versions themselves.
+overrides:
+  "proxy-addr@<2.0.8": "^2.0.8"
+  "body-parser@>=2.0.0 <2.4.0": "^2.4.0"
+  "source-map-js@<1.2.2": "^1.2.2"
+  "zod@>=4.0.0 <4.6.6": "^4.6.7"

@@ -1,3 +1,4 @@
+import { maskEmail } from '../../common/mail/mask-email';
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
@@ -44,7 +45,9 @@ export class AuthMailService {
       ].join(''),
     });
 
-    this.logger.log(`Passwort-Reset-Mail an ${input.email} versendet`);
+    this.logger.log(
+      `Passwort-Reset-Mail an ${maskEmail(input.email)} versendet`,
+    );
   }
 
   private createTransporter() {

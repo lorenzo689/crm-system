@@ -1,0 +1,287 @@
+# Private staging stack. Reachable only through Tailscale Serve on the host
+# (see docs/deployment/staging.md). Nothing listens on a public interface:
+# the reverse proxy is published on 127.0.0.1 only; database, object storage
+# and mail capture are on an internal network without host ports or internet.
+#
+#   cp .env.staging.example .env.staging   # fill in (infrastructure/scripts/staging.sh init)
+#   docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+#
+# Separate from production: own project name, volumes, network, secrets,
+# domain and APP_ENV=staging guard rails (no business jobs, no AI, mail
+# captured by Mailpit, never relayed).
+name: ${COMPOSE_PROJECT_NAME:-bissinger-staging}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  init: true
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-bissinger_os_staging}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 1g, cpus: "1.0" }
+    logging: *logging
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.54
+    <<: *hardening
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/opt/seaweedfs/entrypoint.sh"]
+    environment:
+      S3_BUCKET: ${S3_BUCKET:-bissinger-os-staging}
+      S3_ADMIN_ACCESS_KEY: ${S3_ADMIN_ACCESS_KEY:?set S3_ADMIN_ACCESS_KEY}
+      S3_ADMIN_SECRET_KEY: ${S3_ADMIN_SECRET_KEY:?set S3_ADMIN_SECRET_KEY}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+      S3_BACKUP_ACCESS_KEY: ${S3_BACKUP_ACCESS_KEY:?set S3_BACKUP_ACCESS_KEY}
+      S3_BACKUP_SECRET_KEY: ${S3_BACKUP_SECRET_KEY:?set S3_BACKUP_SECRET_KEY}
+    volumes:
+      - objects:/data
+      - ./seaweedfs/entrypoint.sh:/opt/seaweedfs/entrypoint.sh:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8888/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { memory: 768m, cpus: "1.0" }
+    logging: *logging
+
+  # Creates the bucket and verifies identities before the API starts.
+  storage-init:
+    image: ${BACKUP_IMAGE:-bissinger-os/backup:staging}
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/backup.Dockerfile
+    <<: *hardening
+    command: ["/opt/backup/storage-init.sh"]
+    environment:
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_BUCKET: ${S3_BUCKET:-bissinger-os-staging}
+      S3_ADMIN_ACCESS_KEY: ${S3_ADMIN_ACCESS_KEY}
+      S3_ADMIN_SECRET_KEY: ${S3_ADMIN_SECRET_KEY}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    networks: [backend]
+    depends_on:
+      seaweedfs: { condition: service_healthy }
+    restart: "no"
+    logging: *logging
+
+  # `prisma migrate deploy` from the dedicated migration image (has the CLI).
+  migrate:
+    image: ${MIGRATE_IMAGE:-bissinger-os/migrate:staging}
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+      target: migrate
+    <<: *hardening
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-bissinger_os_staging}
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    logging: *logging
+
+  api:
+    image: ${API_IMAGE:-bissinger-os/api:staging}
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+      target: runtime
+    <<: *hardening
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    cap_drop: [ALL]
+    environment:
+      NODE_ENV: production
+      APP_ENV: staging
+      PORT: "4000"
+      LOG_FORMAT: json
+      # Exactly one trusted hop: Caddy, which sends a single validated address.
+      TRUST_PROXY: "1"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-bissinger_os_staging}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_EXPIRES_IN_MINUTES: ${JWT_EXPIRES_IN_MINUTES:-480}
+      # Must equal the browser origin exactly (Tailscale Serve host name).
+      WEB_ORIGIN: ${STAGING_ORIGIN:?set STAGING_ORIGIN (https://<host>.<tailnet>.ts.net)}
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_REGION: us-east-1
+      S3_BUCKET: ${S3_BUCKET:-bissinger-os-staging}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: "true"
+      # Mail is captured by Mailpit, never relayed (enforced by APP_ENV=staging).
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      MAIL_FROM: ${MAIL_FROM:-Bissinger OS Staging <staging@bissinger-os.invalid>}
+      # Maintenance jobs only; business jobs refuse to start on staging.
+      BACKGROUND_JOBS: ${BACKGROUND_JOBS:-maintenance}
+      ANTHROPIC_API_KEY: ""
+      IMAP_HOST: ""
+    networks: [backend, edge]
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+      storage-init: { condition: service_completed_successfully }
+      mailpit: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/v1/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 20s
+    deploy:
+      resources:
+        limits: { memory: 768m, cpus: "1.0" }
+    logging: *logging
+
+  web:
+    image: ${WEB_IMAGE:-bissinger-os/web:staging}
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+    <<: *hardening
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:size=64m", "/app/apps/web/.next/cache:size=128m,uid=1000,gid=1000"]
+    cap_drop: [ALL]
+    networks: [edge]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { memory: 512m, cpus: "1.0" }
+    logging: *logging
+
+  proxy:
+    image: caddy:2.11.4-alpine
+    <<: *hardening
+    restart: unless-stopped
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    # Loopback only. Tailscale Serve on the host is the single entry point.
+    ports:
+      - "127.0.0.1:${STAGING_PROXY_PORT:-8080}:80"
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [ingress, edge]
+    depends_on:
+      web: { condition: service_healthy }
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/api/v1/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { memory: 128m, cpus: "0.5" }
+    logging: *logging
+
+  # Captures every staging e-mail. No relay is configured, and the backend
+  # network has no route to the internet anyway.
+  mailpit:
+    image: axllent/mailpit:v1.30.4
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: "1000"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    networks: [backend]
+    deploy:
+      resources:
+        limits: { memory: 128m, cpus: "0.25" }
+    logging: *logging
+
+  backup:
+    image: ${BACKUP_IMAGE:-bissinger-os/backup:staging}
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/backup.Dockerfile
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-bissinger_os_staging}
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_BUCKET: ${S3_BUCKET:-bissinger-os-staging}
+      S3_BACKUP_ACCESS_KEY: ${S3_BACKUP_ACCESS_KEY}
+      S3_BACKUP_SECRET_KEY: ${S3_BACKUP_SECRET_KEY}
+      S3_ADMIN_ACCESS_KEY: ${S3_ADMIN_ACCESS_KEY}
+      S3_ADMIN_SECRET_KEY: ${S3_ADMIN_SECRET_KEY}
+      BACKUP_AGE_RECIPIENTS_FILE: /run/backup/recipients.txt
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_MIN_KEEP: ${BACKUP_MIN_KEEP:-3}
+      BACKUP_INITIAL_DELAY_SECONDS: ${BACKUP_INITIAL_DELAY_SECONDS:-600}
+    volumes:
+      # Backups land outside the database/object volumes, ideally on another
+      # disk (STAGING_BACKUP_DIR). Copy them offsite for real protection.
+      - ${STAGING_BACKUP_DIR:-./backups}:/backups
+      # Public age key(s) only; the private key is NOT on this host.
+      - ${BACKUP_AGE_RECIPIENTS:?set BACKUP_AGE_RECIPIENTS (path to age public key file)}:/run/backup/recipients.txt:ro
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+      seaweedfs: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: 512m, cpus: "0.5" }
+    logging: *logging
+
+networks:
+  # Only the proxy: needed to publish its loopback port.
+  ingress: {}
+  # Proxy <-> web/api. No internet access (staging cannot call out).
+  edge:
+    internal: true
+  # API, database, object storage, mail capture, backup. No internet access.
+  backend:
+    internal: true
+
+volumes:
+  pgdata:
+  objects:
+  caddy_data:
+  caddy_config:

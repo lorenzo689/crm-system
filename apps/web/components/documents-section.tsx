@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/auth-api";
+import { useState } from "react";
+import { useApiResource } from "@/lib/use-api-resource";
 import { DocumentUploadModal } from "@/components/document-upload-modal";
 import { VersionUploadModal } from "@/components/version-upload-modal";
 import {
@@ -31,30 +31,23 @@ export function DocumentsSection({
   contextParam,
   contextId,
 }: DocumentsSectionProps) {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data,
+    isLoading,
+    error,
+    reload,
+    setError,
+  } = useApiResource<Document[]>(
+    `/documents?${contextParam}=${contextId}`,
+    "Fehler beim Laden",
+  );
+  const documents = data ?? [];
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [versionUploadTarget, setVersionUploadTarget] = useState<string | null>(
     null,
   );
-
-  function reload() {
-    setIsLoading(true);
-    setError(null);
-    apiFetch<Document[]>(`/documents?${contextParam}=${contextId}`)
-      .then(setDocuments)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Fehler beim Laden"),
-      )
-      .finally(() => setIsLoading(false));
-  }
-
-  useEffect(() => {
-    reload();
-  }, [contextParam, contextId]);
 
   async function handleDownload(documentId: string) {
     setOpenMenuId(null);

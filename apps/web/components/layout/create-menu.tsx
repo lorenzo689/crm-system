@@ -29,6 +29,15 @@ export function CreateMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    function onEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setIsOpen(false);
+    }
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [isOpen]);
+
   function handleSelect(path: string) {
     setIsOpen(false);
     router.push(`${path}?create=1`);
@@ -39,13 +48,15 @@ export function CreateMenu() {
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={isOpen}
+        aria-controls="quick-create-options"
         className="inline-flex h-10 items-center justify-center rounded-full border border-transparent bg-zinc-950 px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-zinc-800 sm:h-11 sm:px-5"
       >
         Neu
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-zinc-200 bg-white py-1 shadow-lg">
+        <div id="quick-create-options" className="app-quick-create absolute right-0 z-20 mt-2 w-56 rounded-xl border border-zinc-200 bg-white py-1 shadow-lg">
           {createOptions.map((option) => (
             <button
               key={option.path}

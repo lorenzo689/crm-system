@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/auth-api";
+import { SessionChangedError, apiFetch } from "@/lib/auth-api";
 import {
   archiveDocument,
   documentTypeLabels,
   fileTooLargeMessage,
   formatFileSize,
-  getDocumentUrl,
+  fetchDocumentBlob,
   MAX_FILE_SIZE_BYTES,
   openDocumentDownload,
   updateDocument,
@@ -113,12 +113,22 @@ export function DocumentPreview({
     if (!versionId || (!isImage && !isPdf)) return;
 
     const controller = new AbortController();
-    getDocumentUrl(document.id, { signal: controller.signal })
-      .then((url) =>
-        setPreviewResult({ versionId, state: { status: "ready", url } }),
-      )
+    let objectUrl: string | null = null;
+    // Fetched through the session-bound client and shown from a local blob
+    // URL, so a changed session can never swap the preview's content.
+    fetchDocumentBlob(document.id, { signal: controller.signal })
+      .then(({ blob }) => {
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewResult({
+          versionId,
+          state: { status: "ready", url: objectUrl },
+        });
+      })
       .catch((caughtError: unknown) => {
         if (controller.signal.aborted) return;
+        // A changed session is reported by the blocking notice, not here.
+        if (caughtError instanceof SessionChangedError) return;
         setPreviewResult({
           versionId,
           state: {
@@ -131,7 +141,10 @@ export function DocumentPreview({
         });
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [document.id, versionId, isImage, isPdf]);
 
   useEffect(() => {

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useDialogFocus } from "@/components/layout/use-dialog-focus";
 import type { Customer } from "./customer-types";
 
 type CustomerFormModalProps = {
@@ -53,39 +54,26 @@ function mapCustomerError(message: string) {
   return message;
 }
 
-export function CustomerFormModal({
+function CustomerFormModalContent({
   customer,
-  isOpen,
   mode,
   onClose,
   onSaved,
 }: CustomerFormModalProps) {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
+  const [formState, setFormState] = useState<FormState>(() =>
+    customer
+      ? {
+          customerNumber: customer.customerNumber,
+          description: customer.description ?? "",
+          name: customer.name,
+          status: customer.status,
+          website: customer.website ?? "",
+        }
+      : initialFormState,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setFormState(
-      customer
-        ? {
-            customerNumber: customer.customerNumber,
-            description: customer.description ?? "",
-            name: customer.name,
-            status: customer.status,
-            website: customer.website ?? "",
-          }
-        : initialFormState,
-    );
-    setError(null);
-  }, [customer, isOpen]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -164,7 +152,7 @@ export function CustomerFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode === "create" ? "Neuen Kunden anlegen" : "Kunden bearbeiten"} tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.24em] text-amber-600">
@@ -179,6 +167,7 @@ export function CustomerFormModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Dialog schließen"
             className="rounded-full p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
           >
             ×
@@ -293,4 +282,15 @@ export function CustomerFormModal({
       </div>
     </div>
   );
+}
+
+/**
+ * Mounted only while open (and re-keyed per record), so every opening starts
+ * from fresh form state without an effect that resets it.
+ */
+export function CustomerFormModal(props: CustomerFormModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+  return <CustomerFormModalContent key={props.customer?.id ?? "new"} {...props} />;
 }

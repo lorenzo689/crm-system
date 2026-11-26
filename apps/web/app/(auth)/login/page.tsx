@@ -3,28 +3,27 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
 import { apiFetch, login as loginRequest } from "@/lib/auth-api";
-import { consumeSessionNotice, storeAccessToken } from "@/lib/session";
+import { getSessionNotice } from "@/lib/session";
+
+const noSubscription = () => () => {};
 
 function BrandMark() {
   return (
     <Link
       href="/"
-      className="inline-flex items-center gap-3"
+      className="inline-flex items-center"
       aria-label="Bissinger OS Startseite"
     >
       <Image
         src="/images/images.jpg"
         alt="Bissinger Lights Logo"
-        width={42}
-        height={42}
-        className="h-10 w-10 rounded-lg object-cover"
+        width={96}
+        height={84}
+        className="h-[84px] w-24 object-contain"
       />
-      <span className="text-[1.05rem] font-semibold tracking-[-0.035em] text-[#151515]">
-        Bissinger OS
-      </span>
     </Link>
   );
 }
@@ -35,12 +34,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    setSessionNotice(consumeSessionNotice());
-  }, []);
+  // Read once per page load; null during server rendering.
+  const sessionNotice = useSyncExternalStore(
+    noSubscription,
+    getSessionNotice,
+    () => null,
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,8 +48,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { accessToken } = await loginRequest({ email, password });
-      storeAccessToken(accessToken);
+      // The API sets the HttpOnly session cookie; the body has no credential.
+      await loginRequest({ email, password });
 
       const landingRoutes: Record<string, string> = {
         DASHBOARD: "/dashboard",
@@ -187,13 +187,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-sm text-[#777]">
-          Noch kein Konto?{" "}
-          <Link
-            href="/register"
-            className="font-semibold text-[#171717] transition hover:text-[#d69a35]"
-          >
-            Registrieren
-          </Link>
+          Kein Zugang? Konten werden von Ihrer Administration angelegt.
         </p>
       </section>
 

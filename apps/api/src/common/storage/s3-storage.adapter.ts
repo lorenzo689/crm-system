@@ -8,17 +8,24 @@ import {
   HeadObjectCommand,
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { DownloadUrlOptions, StorageService } from './storage.interface';
+import { Readable } from 'stream';
+import type { StorageService, StoredObjectStream } from './storage.interface';
 
 /** RFC 6266 header: ASCII fallback plus RFC 5987 `filename*` for umlauts etc. */
-export function buildAttachmentDisposition(fileName: string): string {
+export function buildContentDisposition(
+  type: 'inline' | 'attachment',
+  fileName: string,
+): string {
   const fallback = fileName.replace(/[^\x20-\x7e]|["\\%]/g, '_');
   const encoded = encodeURIComponent(fileName).replace(
     /['()*]/g,
     (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
   );
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+  return `${type}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+export function buildAttachmentDisposition(fileName: string): string {
+  return buildContentDisposition('attachment', fileName);
 }
 
 function requiredEnvironmentVariable(name: string): string {
@@ -114,20 +121,17 @@ export class S3StorageAdapter implements StorageService, OnModuleInit {
     }
   }
 
-  async createDownloadUrl(
-    key: string,
-    expiresInSeconds: number,
-    options: DownloadUrlOptions = {},
-  ): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-      ...(options.disposition === 'attachment' && {
-        ResponseContentDisposition: buildAttachmentDisposition(
-          options.fileName ?? key.split('/').pop() ?? 'download',
-        ),
-      }),
-    });
-    return getSignedUrl(this.client, command, { expiresIn: expiresInSeconds });
+  async openDownload(key: string): Promise<StoredObjectStream> {
+    const response = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    if (!(response.Body instanceof Readable)) {
+      throw new Error('Object storage returned no readable body');
+    }
+    return { body: response.Body, contentLength: response.ContentLength };
+  }
+
+  async ping(): Promise<void> {
+    await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
   }
 }

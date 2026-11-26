@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import type { Contact } from "./customer-types";
 
@@ -26,38 +26,24 @@ const initialFormState: FormState = {
   phone: "",
 };
 
-export function ContactFormModal({
+function ContactFormModalContent({
   customerId,
   contact,
-  isOpen,
   onClose,
   onSaved,
 }: ContactFormModalProps) {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [formState, setFormState] = useState<FormState>(() =>
+    contact
+      ? {
+          email: contact.email ?? "",
+          fullName: contact.fullName,
+          jobTitle: contact.jobTitle ?? "",
+          phone: contact.phone ?? "",
+        }
+      : initialFormState,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    if (contact) {
-      setFormState({
-        email: contact.email ?? "",
-        fullName: contact.fullName,
-        jobTitle: contact.jobTitle ?? "",
-        phone: contact.phone ?? "",
-      });
-    } else {
-      setFormState(initialFormState);
-    }
-    setError(null);
-  }, [contact, isOpen]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -225,4 +211,15 @@ export function ContactFormModal({
       </div>
     </div>
   );
+}
+
+/**
+ * Mounted only while open (and re-keyed per record), so every opening starts
+ * from fresh form state without an effect that resets it.
+ */
+export function ContactFormModal(props: ContactFormModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+  return <ContactFormModalContent key={props.contact?.id ?? "new"} {...props} />;
 }

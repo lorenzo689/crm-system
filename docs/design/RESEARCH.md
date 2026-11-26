@@ -1,0 +1,24 @@
+# Produktrecherche – Bissinger OS
+
+Stand: 26. November 2026. Grundlage sind offizielle Produkt- und Designquellen zu konkreten Arbeitsansichten. „Beobachtung“ beschreibt die Quelle; „Übertragung“ ist unsere Empfehlung.
+
+| System | Beobachtung | Übertragung auf Bissinger OS |
+| --- | --- | --- |
+| Linear | [Gespeicherte Listenansichten](https://linear.app/docs/custom-views) bieten Filter, Favoriten, Gruppen und Vorschau; [Display Options](https://linear.app/docs/display-options) steuern Gruppierung und Spalten; [Suche](https://linear.app/docs/search) trennt globale und aktuelle Ansicht. | Projekt- und Aufgabenlisten sollen stabile, teilbare Ansichten erhalten. Detailvorschau nur dort, wo sie den Listenfluss erhält. |
+| Attio | [Tabellenansichten](https://attio.com/help/reference/managing-your-data/views/create-and-manage-table-views) erlauben Spaltenwahl, Sortierung, Filter, Zellnavigation und Datensatzvorschau; [Workspace-Navigation](https://attio.com/help/reference/productivity-collaborating/navigating-your-workspace) nutzt Suche und kontextuelle Schnellaktionen. | CRM-Listen brauchen kontrollierbare Dichte, eindeutige Spalten und direktes Öffnen des Datensatzes. Keine vollständige Tabellenkalkulation nachbauen. |
+| Stripe Dashboard | [Dashboard-Suche](https://docs.stripe.com/dashboard/search) findet Ressourcen über Typen hinweg, gruppiert Treffer und unterstützt Feldoperatoren und IDs. | Globale Suche nach Kunde, Projekt, Aufgabe und Beleg mit Typ, Trefferkontext und klarer Hauptaktion. Operatoren erst bei belegtem Bedarf. |
+| Raycast | [Search Bar](https://manual.raycast.com/search-bar) nutzt Pfeiltasten, Enter, sekundäre Aktion und Escape; das [Action Panel](https://manual.raycast.com/action-panel) macht weitere Aktionen sichtbar. | `Ctrl/Cmd+K` als schneller Zugang mit sichtbaren Aktionen und konsistenter Tastaturführung; kein verstecktes Expertenwerkzeug als einziger Weg. |
+| Vercel Dashboard | [Aktuelle Navigation](https://vercel.com/changelog/dashboard-navigation-redesign-rollout) priorisiert häufige Abläufe und nutzt eine einklappbare Sidebar; die [Projektübersicht](https://vercel.com/docs/projects) führt zu Status und Details. | Navigation nach tatsächlichen Arbeitsabläufen priorisieren; Kontextwechsel Kunde/Projekt klar vom Wechsel des Moduls trennen. |
+| SAP Fiori | [List Report und Object Page](https://help.sap.com/docs/SAPUI5/d625376e710e40cb9d40e43e1b02933b/c0eec49db81a441e878f528c8f3d28de.html) bilden ein Paar: filtern und bearbeiten in der Liste, vollständige Arbeit am Objekt auf der Detailseite. | Für Kunden, Projekte und Belege eine verlässliche Liste-zu-Detail-Architektur mit klarer Aktionshierarchie. |
+| IBM Carbon | [Data Table Guidelines](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/guidelines) definieren Toolbar, Sortierung, Auswahl, Expansion und abgestufte Zeilenhöhen; [Spezifikation](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/specifications) trennt Hover-, Fokus- und Auswahlzustände. | Ein gemeinsames Tabellensystem mit Dichtevarianten, numerischer Ausrichtung und konsistenten Zuständen; Tabellen erhalten den nötigen Platz. |
+| Atlassian Motion | [Motion Foundations](https://atlassian.design/foundations/motion) unterscheiden kurze Interaktionen (50–150 ms) von räumlichen Übergängen (150–400 ms) und benennen semantische Bewegungstokens. | Häufige Interaktionen sehr kurz; Dialoge und Panels räumlich nachvollziehbar. Kein dekoratives Laden von Tabellenzeilen. |
+
+## Abgeleitete Muster nach Arbeitsbereich
+
+- **Navigation und Suche:** feste Modulstruktur, kontextuelle Projekt-/Kundennavigation, globale Suche mit Typgruppen und tastaturfähigen Aktionen. Beobachtet besonders bei Linear, Attio, Stripe, Raycast und Vercel.
+- **Listen und Tabellen:** Filter und Sortierung an einem Ort; stabile Spaltenbreiten, klare Zeilenhierarchie, optionale Dichte statt willkürlich verschiedener Tabellen. Beobachtet bei Attio, Linear und Carbon.
+- **Datensatzseiten und Formulare:** Übersicht, relevante Beziehungen und Aktionen am Objekt; längere Eingaben in logisch benannten Abschnitten. Beobachtet bei SAP Fiori und Attio. Empfehlung: Bissinger-spezifische Projektbeziehungen vor generischer Metadatenfülle zeigen.
+- **Dashboard:** reale Ausnahmen, nächste Termine und offene Arbeit zuerst. Empfehlung aus Produktkontext; keine Quelle legitimiert erfundene Kennzahlen.
+- **Bewegung:** Zustandswechsel und räumliche Beziehungen anzeigen; Häufigkeit bestimmt Intensität. Direkt aus Atlassians Motion-Regeln abgeleitet.
+
+Die Quellen dokumentieren Muster, keine Freigabe zum Kopieren ihrer Gestaltung. Öffentliche Dokumentation zeigt nicht jede Rolle, jeden Fehlerzustand oder alle Live-Daten. Diese Lücken müssen später am Bissinger-Produkt mit synthetischen Datensätzen geprüft werden.

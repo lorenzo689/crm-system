@@ -44,6 +44,15 @@ yarn-error.log*
 .env*
 !.env.example
 !**/.env.example
+!**/.env.prod.example
+!**/.env.staging.example
+
+# staging/production secrets, keys and backups never enter git
+infrastructure/docker/secrets/
+infrastructure/docker/backups/
+*.agekey
+*.age
+.staging-test/
 
 # vercel
 .vercel
@@ -51,3 +60,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local runtime artifacts
+.runtime/
+*.log
+**/dist-scripts
+apps/api/apps/

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useDialogFocus } from "@/components/layout/use-dialog-focus";
 
 export type TaskStatus =
   | "OPEN"
@@ -89,8 +90,7 @@ function toDateInputValue(isoString: string | null): string {
   return isoString.slice(0, 10);
 }
 
-export function TaskFormModal({
-  isOpen,
+function TaskFormModalContent({
   task,
   projects,
   users,
@@ -98,43 +98,27 @@ export function TaskFormModal({
   onClose,
   onSaved,
 }: TaskFormModalProps) {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
+  const [formState, setFormState] = useState<FormState>(() =>
+    task
+      ? {
+          projectId: task.project?.id ?? "",
+          title: task.title,
+          description: task.description ?? "",
+          status: task.status,
+          priority: task.priority,
+          responsibleUserId:
+            task.assignments.find(
+              (assignment) => assignment.role === "RESPONSIBLE",
+            )?.userId ?? "",
+          startAt: toDateInputValue(task.startAt),
+          dueAt: toDateInputValue(task.dueAt),
+        }
+      : { ...initialFormState, projectId: defaultProjectId ?? "" },
+  );
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    if (task) {
-      const responsible = task.assignments.find(
-        (assignment) => assignment.role === "RESPONSIBLE",
-      );
-      setFormState({
-        projectId: task.project?.id ?? "",
-        title: task.title,
-        description: task.description ?? "",
-        status: task.status,
-        priority: task.priority,
-        responsibleUserId: responsible?.userId ?? "",
-        startAt: toDateInputValue(task.startAt),
-        dueAt: toDateInputValue(task.dueAt),
-      });
-    } else {
-      setFormState({
-        ...initialFormState,
-        projectId: defaultProjectId ?? "",
-      });
-    }
-    setError(null);
-    setWarning(null);
-  }, [isOpen, task, defaultProjectId]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -229,7 +213,7 @@ export function TaskFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={task ? "Aufgabe bearbeiten" : "Neue Aufgabe anlegen"} tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-900">
             {task ? "Aufgabe bearbeiten" : "Neue Aufgabe anlegen"}
@@ -436,4 +420,15 @@ export function TaskFormModal({
       </div>
     </div>
   );
+}
+
+/**
+ * Mounted only while open (and re-keyed per record), so every opening starts
+ * from fresh form state without an effect that resets it.
+ */
+export function TaskFormModal(props: TaskFormModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+  return <TaskFormModalContent key={`${props.task?.id ?? "new"}:${props.defaultProjectId ?? ""}`} {...props} />;
 }

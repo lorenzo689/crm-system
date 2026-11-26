@@ -10,19 +10,16 @@ function BrandMark() {
   return (
     <Link
       href="/"
-      className="inline-flex items-center gap-3"
+      className="inline-flex items-center"
       aria-label="Bissinger OS Startseite"
     >
       <Image
         src="/images/images.jpg"
         alt="Bissinger Lights Logo"
-        width={42}
-        height={42}
-        className="h-10 w-10 rounded-lg object-cover"
+        width={96}
+        height={84}
+        className="h-[84px] w-24 object-contain"
       />
-      <span className="text-[1.05rem] font-semibold tracking-[-0.035em] text-[#151515]">
-        Bissinger OS
-      </span>
     </Link>
   );
 }
@@ -31,11 +28,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<{
-    message: string;
-    resetUrl?: string;
-    expiresAt?: string;
-  } | null>(null);
+  const [result, setResult] = useState<{ message: string } | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,7 +65,7 @@ export default function ForgotPasswordPage() {
               </h1>
               <p className="mt-3 text-sm leading-6 text-[#686868]">
                 {"Wir senden einen Reset-Link an die hinterlegte E-Mail-Adresse."}
-                {" Lokal k\u00f6nnt ihr die Nachricht zus\u00e4tzlich in Mailpit unter"}
+                {" Lokal können Sie die Nachricht zusätzlich in Mailpit unter"}
                 {" `http://localhost:8025` pr\u00fcfen."}
               </p>
             </div>
@@ -90,21 +83,6 @@ export default function ForgotPasswordPage() {
               {result && (
                 <div className="space-y-3 rounded-[0.3rem] border border-[#d5e7d7] bg-[#f5fbf6] px-4 py-4 text-sm text-[#215732]">
                   <p>{result.message}</p>
-                  {result.resetUrl && (
-                    <Link
-                      href={result.resetUrl}
-                      className="inline-flex items-center gap-2 font-semibold text-[#171717] underline decoration-[#d69a35] underline-offset-4"
-                    >
-                      <FiKey />
-                      {"Reset-Formular direkt \u00f6ffnen"}
-                    </Link>
-                  )}
-                  {result.expiresAt && (
-                    <p className="text-xs text-[#51715b]">
-                      {"G\u00fcltig bis:"}{" "}
-                      {new Date(result.expiresAt).toLocaleString()}
-                    </p>
-                  )}
                 </div>
               )}
 

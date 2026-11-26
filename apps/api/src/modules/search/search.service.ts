@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { findDocumentIdsByFullText } from './full-text';
 
 const MAX_RESULTS_PER_CATEGORY = 5;
 const MIN_QUERY_LENGTH = 2;
@@ -16,7 +17,14 @@ export class SearchService {
       return { customers: [], projects: [], tasks: [], documents: [] };
     }
 
-    const [customers, projects, tasks, documents] = await Promise.all([
+    const rankedIds = await findDocumentIdsByFullText(
+      this.prisma,
+      organizationId,
+      trimmedQuery,
+      MAX_RESULTS_PER_CATEGORY,
+    );
+
+    const [customers, projects, tasks, matchedDocuments] = await Promise.all([
       this.prisma.customer.findMany({
         where: {
           organizationId,
@@ -57,6 +65,7 @@ export class SearchService {
           organizationId,
           archivedAt: null,
           OR: [
+            { id: { in: rankedIds } },
             { title: { contains: trimmedQuery, mode: 'insensitive' } },
             {
               currentVersion: {
@@ -87,6 +96,15 @@ export class SearchService {
         },
       }),
     ]);
+
+    // Relevance-ranked full-text hits first, substring matches after.
+    const rank = (id: string) => {
+      const index = rankedIds.indexOf(id);
+      return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+    };
+    const documents = [...matchedDocuments].sort(
+      (a, b) => rank(a.id) - rank(b.id),
+    );
 
     const snippets = await this.findContentSnippets(
       documents.map((document) => document.id),

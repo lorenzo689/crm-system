@@ -1,18 +1,16 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import {
-  FiFolder,
   FiCheckSquare,
   FiCalendar,
-  FiClock,
   FiAlertTriangle,
   FiArrowRight,
 } from "react-icons/fi";
 import { useEffect, useState } from "react";
+import { FinanceOverview } from "@/components/finance-overview";
+import { useCurrentUser } from "@/lib/use-current-user";
 import { apiFetch } from "@/lib/auth-api";
-import type { CurrentUser } from "@/lib/user-profile";
 
 type TaskStatus =
   "OPEN" | "IN_PROGRESS" | "WAITING" | "BLOCKED" | "COMPLETED" | "CANCELLED";
@@ -68,20 +66,14 @@ function formatDateTime(value: string) {
 }
 
 export function DashboardContent() {
+  const { isAdmin, user } = useCurrentUser();
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
-  const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch<DashboardResponse>("/dashboard"),
-      apiFetch<CurrentUser>("/users/me"),
-    ])
-      .then(([loadedDashboard, loadedUser]) => {
-        setDashboard(loadedDashboard);
-        setUser(loadedUser);
-      })
+    apiFetch<DashboardResponse>("/dashboard")
+      .then(setDashboard)
       .catch((caughtError: unknown) =>
         setError(
           caughtError instanceof Error
@@ -93,11 +85,11 @@ export function DashboardContent() {
   }, []);
 
   if (isLoading) {
-    return <p className="p-6 text-sm text-zinc-400 sm:p-8">Lädt…</p>;
+    return <div className="crm-page dashboard-page" role="status" aria-label="Übersicht wird geladen"><div className="app-skeleton app-skeleton-title" /><div className="app-skeleton app-skeleton-row" /><div className="app-skeleton app-skeleton-panel" /></div>;
   }
 
   if (error) {
-    return <p className="p-6 text-sm text-red-600 sm:p-8">{error}</p>;
+    return <div className="crm-page"><div className="app-error" role="alert"><strong>Übersicht konnte nicht geladen werden</strong><p>{/Too Many Requests/i.test(error) ? "Zu viele Anfragen. Bitte kurz warten und erneut versuchen." : error}</p><button type="button" onClick={() => window.location.reload()}>Erneut laden</button></div></div>;
   }
 
   if (!dashboard || !user) {
@@ -137,7 +129,14 @@ export function DashboardContent() {
   const onTrackPercent = totalProjects
     ? (dashboard.dayStatus.projectsOnTrack / totalProjects) * 100
     : 0;
-  const icons = [FiFolder, FiCheckSquare, FiCalendar, FiClock];
+  const statusParts = [
+    dashboard.dayStatus.projectsOnTrack > 0
+      ? `${dashboard.dayStatus.projectsOnTrack} ${dashboard.dayStatus.projectsOnTrack === 1 ? "Projekt läuft" : "Projekte laufen"} planmäßig`
+      : null,
+    dashboard.dayStatus.projectsNeedingAttention > 0
+      ? `${dashboard.dayStatus.projectsNeedingAttention} ${dashboard.dayStatus.projectsNeedingAttention === 1 ? "Projekt benötigt" : "Projekte benötigen"} Aufmerksamkeit`
+      : null,
+  ].filter(Boolean);
   return (
     <div className="crm-page dashboard-page">
       <div className="dashboard-welcome">
@@ -148,35 +147,17 @@ export function DashboardContent() {
             Projekte, Aufgaben und Termine rund um Ihre Lichttechnik-Projekte.
           </p>
         </div>
-        <div className="dashboard-banner">
-          <Image
-            src="/images/background.jpg"
-            alt="Beleuchtete Bühnenstufen"
-            fill
-            priority
-            sizes="(max-width: 760px) 100vw, 40vw"
-          />
-          <strong>
-            The discreet light
-            <br />
-            behind every
-            <br />
-            great performance.
-          </strong>
-        </div>
       </div>
       <div className="dashboard-kpis">
         {kpiItems.map((item, index) => {
-          const Icon = icons[index];
           return (
             <Link
               href={index === 0 ? "/projects" : "/tasks"}
               className="crm-card dashboard-kpi"
+              data-urgent={index >= 2 && item.value > 0 ? true : undefined}
               key={item.label}
+              title={item.detail}
             >
-              <span className="crm-icon-disc">
-                <Icon />
-              </span>
               <div>
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
@@ -185,37 +166,61 @@ export function DashboardContent() {
           );
         })}
       </div>
+      <section className="crm-card dashboard-attention">
+        <div className="crm-section-heading">
+          <div>
+            <h2>Handlungsbedarf</h2>
+            <p>{dashboard.projectsRequiringAttention.length ? dashboard.projectsRequiringAttention.length === 1 ? "1 Projekt benötigt Ihre Aufmerksamkeit." : `${dashboard.projectsRequiringAttention.length} Projekte benötigen Ihre Aufmerksamkeit.` : "Alle Projekte laufen planmäßig."}</p>
+          </div>
+          <Link href="/projects">Alle Projekte <FiArrowRight /></Link>
+        </div>
+        {dashboard.projectsRequiringAttention.length > 0 && (
+          <div className="crm-table-container">
+            <table>
+              <thead><tr><th>Projekt</th><th>Kunde</th><th>Grund</th><th><span className="sr-only">Öffnen</span></th></tr></thead>
+              <tbody>
+                {dashboard.projectsRequiringAttention.map((project) => (
+                  <tr key={project.id}>
+                    <td><Link className="crm-name" href={`/projects/${project.id}`}><FiAlertTriangle />{project.name}</Link></td>
+                    <td>{project.customerName ?? "Ohne Kundenbezug"}</td>
+                    <td>{project.reasons.map((reason) => <span className="crm-badge" key={reason.code}>{reason.label}</span>)}</td>
+                    <td><Link href={`/projects/${project.id}`}>Öffnen <span aria-hidden>→</span></Link></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
       <div className="dashboard-middle">
         <section className="crm-card">
-          <h2>Projektstatus (aktiv)</h2>
-          <div className="dashboard-chart-layout">
-            <div
-              className="dashboard-donut"
-              role="img"
-              aria-label={`${dashboard.dayStatus.projectsOnTrack} Projekte im Plan, ${dashboard.dayStatus.projectsNeedingAttention} mit Handlungsbedarf`}
-              style={{
-                background: `conic-gradient(#bc8127 0% ${onTrackPercent}%, #dedbd5 ${onTrackPercent}% 100%)`,
-              }}
-            >
-              <div>
-                <strong>{totalProjects}</strong>
-                <span>Projekte</span>
-              </div>
-            </div>
-            <ul className="dashboard-chart-legend">
-              <li>
-                <i />
-                <span>Im Plan</span>
-                <b>{dashboard.dayStatus.projectsOnTrack}</b>
-              </li>
-              <li>
-                <i />
-                <span>Handlungsbedarf</span>
-                <b>{dashboard.dayStatus.projectsNeedingAttention}</b>
-              </li>
-            </ul>
+          <h2>Projektstatus</h2>
+          <div className="dashboard-status-summary">
+            <strong>{totalProjects}</strong>
+            <span>{totalProjects === 1 ? "aktives Projekt im Blick" : "aktive Projekte im Blick"}</span>
           </div>
-          <p className="dashboard-status">{dashboard.dayStatus.message}</p>
+          {totalProjects > 0 && (
+            <>
+              <div className="dashboard-status-bar" role="img" aria-label={`${dashboard.dayStatus.projectsOnTrack} Projekte im Plan, ${dashboard.dayStatus.projectsNeedingAttention} mit Handlungsbedarf`}>
+                <span style={{ width: `${onTrackPercent}%` }} />
+              </div>
+              <div className="dashboard-chart-layout">
+                <ul className="dashboard-chart-legend">
+                  <li>
+                    <i />
+                    <span>Im Plan</span>
+                    <b>{dashboard.dayStatus.projectsOnTrack}</b>
+                  </li>
+                  <li>
+                    <i />
+                    <span>Handlungsbedarf</span>
+                    <b>{dashboard.dayStatus.projectsNeedingAttention}</b>
+                  </li>
+                </ul>
+              </div>
+            </>
+          )}
+          <p className="dashboard-status">{statusParts.length ? `${statusParts.join(", ")}.` : "Noch keine aktiven Projekte vorhanden."}</p>
         </section>
         <section className="crm-card">
           <div className="crm-section-heading">
@@ -248,58 +253,12 @@ export function DashboardContent() {
                 </time>
               </Link>
             ))}
+            {!dashboard.myTasks.length && <p className="crm-empty">Keine offenen Aufgaben für Sie.</p>}
           </div>
         </section>
       </div>
-      <section className="crm-card dashboard-attention">
-        <div className="crm-section-heading">
-          <h2>Projekte mit Handlungsbedarf</h2>
-          <Link href="/projects">
-            Alle Projekte <FiArrowRight />
-          </Link>
-        </div>
-        <div className="crm-table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Projekt</th>
-                <th>Kunde</th>
-                <th>Handlungsbedarf</th>
-                <th>Aktion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboard.projectsRequiringAttention.map((project) => (
-                <tr key={project.id}>
-                  <td>
-                    <Link className="crm-name" href={`/projects/${project.id}`}>
-                      <FiAlertTriangle />
-                      {project.name}
-                    </Link>
-                  </td>
-                  <td>{project.customerName ?? "Ohne Kundenbezug"}</td>
-                  <td>
-                    {project.reasons.map((reason) => (
-                      <span className="crm-badge" key={reason.code}>
-                        {reason.label}
-                      </span>
-                    ))}
-                  </td>
-                  <td>
-                    <Link href={`/projects/${project.id}`}>
-                      Projekt öffnen <span aria-hidden>→</span>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!dashboard.projectsRequiringAttention.length && (
-          <p className="crm-empty">Alle Projekte laufen planmäßig.</p>
-        )}
-      </section>
-      <details className="crm-card dashboard-activity">
+      {isAdmin && <FinanceOverview />}
+      <details className="crm-card dashboard-activity" open>
         <summary>
           Letzte Aktivitäten ({dashboard.recentActivities.length})
         </summary>

@@ -6,24 +6,27 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { FiCheck, FiEye, FiEyeOff, FiLock } from "react-icons/fi";
 import { resetPassword as resetPasswordRequest } from "@/lib/auth-api";
+import {
+  getPasswordRequirements,
+  isPasswordValid,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from "@/lib/password-policy";
 
 function BrandMark() {
   return (
     <Link
       href="/"
-      className="inline-flex items-center gap-3"
+      className="inline-flex items-center"
       aria-label="Bissinger OS Startseite"
     >
       <Image
         src="/images/images.jpg"
         alt="Bissinger Lights Logo"
-        width={42}
-        height={42}
-        className="h-10 w-10 rounded-lg object-cover"
+        width={96}
+        height={84}
+        className="h-[84px] w-24 object-contain"
       />
-      <span className="text-[1.05rem] font-semibold tracking-[-0.035em] text-[#151515]">
-        Bissinger OS
-      </span>
     </Link>
   );
 }
@@ -41,13 +44,8 @@ export function ResetPasswordForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const requirements = {
-    minLength: password.length >= 8,
-    uppercase: /[A-Z]/.test(password),
-    number: /\d/.test(password),
-    specialCharacter: /[^A-Za-z0-9]/.test(password),
-  };
-  const passwordIsValid = Object.values(requirements).every(Boolean);
+  const requirements = getPasswordRequirements(password);
+  const passwordIsValid = isPasswordValid(password);
   const passwordsMatch =
     passwordConfirmation.length > 0 && password === passwordConfirmation;
 
@@ -144,7 +142,8 @@ export function ResetPasswordForm() {
                     placeholder="Passwort erstellen"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
                     required
                     className="h-14 w-full rounded-[0.3rem] border border-[#cfcfcf] bg-white px-4 pr-12 text-sm text-[#1f1f1f] outline-none transition placeholder:text-[#aaa] focus:border-[#d69a35] focus:ring-1 focus:ring-[#d69a35]"
                   />
@@ -162,7 +161,14 @@ export function ResetPasswordForm() {
 
                 <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[0.7rem]">
                   {[
-                    { fulfilled: requirements.minLength, label: "8 Zeichen" },
+                    {
+                      fulfilled: requirements.minLength,
+                      label: `${PASSWORD_MIN_LENGTH} Zeichen`,
+                    },
+                    {
+                      fulfilled: requirements.lowercase,
+                      label: "Kleinbuchstabe",
+                    },
                     { fulfilled: requirements.uppercase, label: "Gro\u00dfbuchstabe" },
                     { fulfilled: requirements.number, label: "Zahl" },
                     {

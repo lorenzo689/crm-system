@@ -308,7 +308,7 @@ export default function TasksPage() {
           };
         } catch {
           setQuickError(
-            "Aufgabe wurde angelegt, konnte dir aber nicht zugewiesen werden.",
+            "Die Aufgabe wurde angelegt, konnte Ihnen aber nicht zugewiesen werden.",
           );
         }
       }
@@ -402,16 +402,18 @@ export default function TasksPage() {
   const { startOfToday, endOfToday } = getDayBounds();
   const endOfWeek = new Date(startOfToday);
   endOfWeek.setDate(endOfWeek.getDate() + (7 - ((endOfWeek.getDay() + 6) % 7)));
-  const taskGroups = [
+  const activeTasks = filteredTasks.filter((task) => isOpenStatus(task.status));
+  const closedTasks = filteredTasks.filter((task) => !isOpenStatus(task.status));
+  const activeGroups = [
     {
       label: "Heute & überfällig",
-      items: filteredTasks.filter(
+      items: activeTasks.filter(
         (t) => t.dueAt && new Date(t.dueAt) < endOfToday,
       ),
     },
     {
       label: "Diese Woche",
-      items: filteredTasks.filter(
+      items: activeTasks.filter(
         (t) =>
           t.dueAt &&
           new Date(t.dueAt) >= endOfToday &&
@@ -420,11 +422,14 @@ export default function TasksPage() {
     },
     {
       label: "Später & ohne Termin",
-      items: filteredTasks.filter(
+      items: activeTasks.filter(
         (t) => !t.dueAt || new Date(t.dueAt) >= endOfWeek,
       ),
     },
   ];
+  const taskGroups = statusFilter === "COMPLETED"
+    ? [{ label: "Erledigt", items: filteredTasks }]
+    : [...activeGroups, ...(closedTasks.length ? [{ label: "Abgeschlossen", items: closedTasks }] : [])];
 
   return (
     <div className="crm-page tasks-page">
@@ -656,12 +661,17 @@ export default function TasksPage() {
         </div>
       </details>
       {taskGroups.map((group) => (
-        <details key={group.label} className="crm-task-group" open>
+        <details key={group.label} className="crm-task-group" data-empty={!group.items.length} open={group.items.length > 0}>
           <summary>
             {group.label} ({group.items.length})
+            {!group.items.length && <span className="task-group-empty-note">Keine Aufgaben</span>}
           </summary>
+          {group.items.length > 0 && (
           <div className="crm-table-container overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="task-table w-full text-sm">
+              <colgroup>
+                <col style={{ width: 44 }} /><col style={{ width: 275 }} /><col style={{ width: 210 }} /><col style={{ width: 100 }} /><col style={{ width: 90 }} /><col style={{ width: 110 }} /><col style={{ width: 140 }} /><col style={{ width: 150 }} />
+              </colgroup>
               <thead>
                 <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wider text-zinc-400">
                   <th className="w-10 px-4 py-3 font-medium">
@@ -701,7 +711,7 @@ export default function TasksPage() {
                       data-highlighted={
                         task.id === highlightedTaskId || undefined
                       }
-                      className={`border-b border-zinc-100 transition-colors duration-700 last:border-0 hover:bg-zinc-50 ${
+                      className={`border-b border-zinc-100 transition-colors duration-150 last:border-0 hover:bg-zinc-50 ${
                         task.id === highlightedTaskId ? "bg-amber-50" : ""
                       }`}
                     >
@@ -755,21 +765,14 @@ export default function TasksPage() {
                       <td className="px-4 py-3 text-zinc-600">{responsible}</td>
                       <td
                         className={`px-4 py-3 ${
-                          isOverdue
-                            ? "font-medium text-red-600"
-                            : isDueToday
+                          isDueToday
                               ? "font-medium text-amber-700"
                               : "text-zinc-600"
                         }`}
                       >
                         {due ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            {isOverdue && (
-                              <span
-                                title="Überfällig"
-                                className="inline-block h-2 w-2 rounded-full bg-red-600"
-                              />
-                            )}
+                          <span className={isOverdue ? "task-due-overdue" : "inline-flex items-center gap-1.5"}>
+                            {isOverdue && <span>Überfällig</span>}
                             {due.toLocaleDateString("de-DE")}
                             {isDueToday && (
                               <span className="text-xs font-normal">heute</span>
@@ -808,12 +811,8 @@ export default function TasksPage() {
               </tbody>
             </table>
 
-            {group.items.length === 0 && (
-              <p className="p-8 text-center text-sm text-zinc-400">
-                Keine Aufgaben gefunden.
-              </p>
-            )}
           </div>
+          )}
         </details>
       ))}
 

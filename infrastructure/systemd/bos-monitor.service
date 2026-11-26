@@ -1,0 +1,11 @@
+[Unit]
+Description=Bissinger OS staging monitor (staging.sh monitor)
+After=docker.service
+OnFailure=bos-alert@%n.service
+
+[Service]
+Type=oneshot
+# Adjust to the checkout and to the operator account (member of group docker).
+User=bos-ops
+WorkingDirectory=/opt/bissinger-os
+ExecStart=/opt/bissinger-os/infrastructure/scripts/staging.sh monitor

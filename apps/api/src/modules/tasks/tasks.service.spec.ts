@@ -39,6 +39,10 @@ function setup(existing: Record<string, unknown> = {}) {
     repository as never,
     prisma as never,
     activities as never,
+    {
+      assertProjectWritable: jest.fn(),
+      assertActiveOrganizationMember: jest.fn(),
+    } as never,
   );
   return { service, repository, prisma, activities };
 }

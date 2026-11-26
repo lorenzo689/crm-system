@@ -1,10 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ActivityType } from '../../../generated/prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import {
-  ActivitiesRepository,
-  ActivityContext,
-} from './activities.repository';
+import { ActivitiesRepository, ActivityContext } from './activities.repository';
 
 type LogActivityParams = {
   type: ActivityType;

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useDialogFocus } from "@/components/layout/use-dialog-focus";
 import {
   priorityLabels,
   statusLabels,
@@ -68,42 +69,29 @@ function toDateInputValue(isoString: string | null): string {
   return isoString.slice(0, 10);
 }
 
-export function ProjectFormModal({
-  isOpen,
+function ProjectFormModalContent({
   project,
   customers,
   onClose,
   onSaved,
 }: ProjectFormModalProps) {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
+  const [formState, setFormState] = useState<FormState>(() =>
+    project
+      ? {
+          customerId: project.customer.id,
+          name: project.name,
+          projectNumber: project.projectNumber,
+          status: project.status,
+          priority: project.priority,
+          description: project.description ?? "",
+          startsAt: toDateInputValue(project.startsAt),
+          endsAt: toDateInputValue(project.endsAt),
+        }
+      : initialFormState,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    if (project) {
-      setFormState({
-        customerId: project.customer.id,
-        name: project.name,
-        projectNumber: project.projectNumber,
-        status: project.status,
-        priority: project.priority,
-        description: project.description ?? "",
-        startsAt: toDateInputValue(project.startsAt),
-        endsAt: toDateInputValue(project.endsAt),
-      });
-    } else {
-      setFormState(initialFormState);
-    }
-    setError(null);
-  }, [isOpen, project]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -156,7 +144,7 @@ export function ProjectFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={project ? "Projekt bearbeiten" : "Neues Projekt anlegen"} tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-900">
             {project ? "Projekt bearbeiten" : "Neues Projekt anlegen"}
@@ -342,4 +330,15 @@ export function ProjectFormModal({
       </div>
     </div>
   );
+}
+
+/**
+ * Mounted only while open (and re-keyed per record), so every opening starts
+ * from fresh form state without an effect that resets it.
+ */
+export function ProjectFormModal(props: ProjectFormModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+  return <ProjectFormModalContent key={props.project?.id ?? "new"} {...props} />;
 }
