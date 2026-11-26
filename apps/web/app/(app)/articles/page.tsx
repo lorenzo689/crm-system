@@ -91,10 +91,7 @@ export default function ArticlesPage() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">
-            ARTIKEL
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-zinc-900">
+          <h1 className="text-2xl font-semibold text-zinc-900">
             Artikelstamm & Lager
           </h1>
           <p className="mt-2 text-sm text-zinc-500">
@@ -198,7 +195,7 @@ export default function ArticlesPage() {
             {visible.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-zinc-400">
-                  Keine Artikel gefunden.
+                  <div className="app-table-empty"><strong>{articles.length ? "Keine passenden Artikel" : "Noch keine Artikel vorhanden"}</strong><span>{articles.length ? "Passen Sie die Suche an." : "Legen Sie den ersten Artikel über die Aktion oben an."}</span></div>
                 </td>
               </tr>
             )}
@@ -407,39 +404,6 @@ function ArticleModal({
                   min={0}
                   value={form.minStock}
                   onChange={(event) => update("minStock", event.target.value)}
-                  className={`${inputClass} mt-1`}
-                />
-              </label>
-            </div>
-          )}
-
-          <label className="flex items-center gap-2 text-sm text-zinc-700">
-            <input
-              type="checkbox"
-              checked={form.isRentable}
-              onChange={(event) => update("isRentable", event.target.checked)}
-            />
-            Zur Miete (Equipment-Verleih)
-          </label>
-
-          {form.isRentable && (
-            <div className="grid grid-cols-2 gap-4">
-              <label className="text-xs font-medium text-zinc-600">
-                Mietbestand (Stück)
-                <input
-                  type="number"
-                  min={0}
-                  value={form.rentalStock}
-                  onChange={(event) => update("rentalStock", event.target.value)}
-                  className={`${inputClass} mt-1`}
-                />
-              </label>
-              <label className="text-xs font-medium text-zinc-600">
-                Tagesmiete netto (€)
-                <input
-                  value={form.rentalPrice}
-                  onChange={(event) => update("rentalPrice", event.target.value)}
-                  inputMode="decimal"
                   className={`${inputClass} mt-1`}
                 />
               </label>

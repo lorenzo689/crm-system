@@ -117,7 +117,7 @@ export function RefreshedNotice({
       className="fixed inset-x-0 top-0 z-[100] flex flex-wrap items-center justify-center gap-3 border-b border-[#f0d9a8] bg-[#fff7e8] px-4 py-3 text-sm text-[#805b10] shadow-sm"
     >
       <span>
-        Deine Sitzung oder Berechtigung hat sich geändert; die Seite wurde mit
+        Ihre Sitzung oder Berechtigung hat sich geändert; die Seite wurde mit
         aktuellen Daten neu aufgebaut.
         {drafts.length > 0 &&
           ` ${drafts.length} nicht gespeicherte Eingabe(n) wurden verworfen.`}

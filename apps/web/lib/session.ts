@@ -43,7 +43,7 @@ export type SessionState =
   | { status: "error"; message: string };
 
 export const SESSION_CHANGED_MESSAGE =
-  "Die Anmeldung hat sich geändert. Bitte überprüfe deine Eingaben und lade die Seite neu.";
+  "Die Anmeldung hat sich geändert. Bitte überprüfen Sie Ihre Eingaben und laden Sie die Seite neu.";
 
 /** Thrown instead of sending (or re-sending) a request under a new identity. */
 export class SessionChangedError extends Error {

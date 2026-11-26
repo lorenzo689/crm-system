@@ -18,6 +18,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  devIndicators: false,
   compress: true,
   // Container builds set NEXT_OUTPUT=standalone (self-contained server.js).
   // Not the default: standalone output needs symlinks, which local Windows

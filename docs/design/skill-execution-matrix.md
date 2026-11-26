@@ -1,0 +1,15 @@
+# Skill-Ausführungsmatrix – Phase 0
+
+Installationsbasis: `C:/Users/Lorin/.agents/skills/` (der im Auftrag genannte Pfad `C:/Users/Lorin.agents/skills/` enthält einen Schreibfehler). Die installierten Dateien und Versionen sind maßgeblich.
+
+| Skill | Installierte Quelle / Stand | Befehle, Skripte und relevante Referenzen | Phase-0-Nutzung |
+| --- | --- | --- | --- |
+| Impeccable | `impeccable/SKILL.md`, 4.11.0 | `scripts/impeccable.cmd`; Befehle u. a. `context`, `audit`, `critique`, `polish`, `shape`, `document`, `extract`, `adapt`, `animate`, `typeset`, `layout`, `optimize`, `live`, `generate`; `reference/audit.md`, `operate.md`, `polish.md`, `craft-floor.md` | Operate-Modus und Audit-Kriterien gelesen; kein Designbefehl ausgeführt. Der Kontextstarter war in einem früheren Durchgang am Cache-Zugriff gescheitert. |
+| Design Taste Frontend | `design-taste-frontend/SKILL.md`, tasteskill 2.5.1 | Installiert: `scripts/start.mjs`, `shoot.mjs`, `consistency.mjs`, `copy-lint.mjs`, `perf.mjs`, `gate.mjs`, `moments.mjs`, `effects.mjs`, `photos.mjs`, `icons.mjs`; `references/` für Layout, Abschnitte, Bewegung und Gate. Ein im Text erwähnter `check.mjs` liegt in dieser Installation nicht vor. | Skill gelesen und tatsächlichen Skriptbestand inventarisiert. Der Website-Gate ist nicht als Prüfung einer authentifizierten CRM-Oberfläche ausgeführt worden. |
+| Frontend Design | `frontend-design/SKILL.md` | Kein ausführbares Skript; Leitlinien für Typografie, Raster, Markenbezug, Bewegung und UX-Text | Gelesen; vorhandene Markenwelt als Baseline erfasst. |
+| UI/UX Pro Max | `ui-ux-pro-max/SKILL.md` | `scripts/search.py` mit `--domain`, `--stack`, `--design-system`; `references/quick-reference.md`, `pro-rules.md`; lokale UX-, Farb-, Typografie- und Next.js-Kataloge | Gelesen; relevante Referenzen und Suchmodi inventarisiert. Kein neues Designsystem erzeugt. |
+| Web Design Guidelines | `web-design-guidelines/SKILL.md`, 1.1.0 | `references/command.md` als gebündelter Regelsatz; kein eigenes Prüfsystem | Skill und Regelsatz gelesen; konkrete Prüffelder für spätere A11y- und Interaktionsprüfung notiert. |
+| Vercel React Best Practices | `vercel-react-best-practices/SKILL.md`, 1.0.0 | `AGENTS.md` als Gesamtleitfaden; 70 Einzelregeln in `rules/` (z. B. `async-parallel.md`, `bundle-dynamic-imports.md`, `rendering-content-visibility.md`) | Skill und exemplarische Parallelisierungsregel gelesen; keine Refaktorierung ausgeführt. |
+| Webapp Testing | `webapp-testing/SKILL.md` | `scripts/with_server.py` (vor Verwendung `--help`); Playwright-Python-Beispiele unter `examples/` | Skill gelesen; frühere Playwright-Bildserie als historische Referenz eingeordnet. Kein neuer authentifizierter Browserlauf. |
+
+Repository-Regeln: `AGENTS.md` und `apps/web/AGENTS.md` verlangen die zur Änderung passenden Next.js-Anleitungen aus `apps/web/node_modules/next/dist/docs/` vor Codeänderungen. Die vorhandenen Regeln untersagen keine Phase-0-Dokumentation. Die bestehenden Sicherheitsunterlagen unter `docs/security/` und die API-Verträge bleiben für spätere Implementierung maßgeblich.

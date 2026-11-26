@@ -72,7 +72,7 @@ export function ProfileContent() {
                 {user.displayName}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-                Deine Kontodaten und dein Organisationskontext in Bissinger OS.
+Ihre Kontodaten und Ihr Organisationskontext in Bissinger OS.
               </p>
             </div>
           </div>

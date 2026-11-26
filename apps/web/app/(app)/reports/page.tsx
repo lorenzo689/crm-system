@@ -52,7 +52,6 @@ export default function ReportsPage() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">AUSWERTUNGEN</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Projekte, Kunden & Exporte</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">

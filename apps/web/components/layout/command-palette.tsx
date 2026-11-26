@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import { useCurrentUser } from "@/lib/use-current-user";
 
@@ -14,7 +14,6 @@ type SearchResponse = Record<
 
 const pages: Entry[] = [
   ["Übersicht", "/dashboard"],
-  ["KI-Assistent", "/assistant"],
   ["Posteingang", "/inbox"],
   ["Kunden", "/customers"],
   ["Projekte", "/projects"],
@@ -25,7 +24,6 @@ const pages: Entry[] = [
   ["Angebote", "/quotes"],
   ["Rechnungen", "/invoices"],
   ["Gutschriften", "/credit-notes"],
-  ["Verleih / Reservierungen", "/rental"],
   ["Zeiterfassung", "/time"],
   ["Abos / wiederkehrende Rechnungen", "/recurring"],
   ["Finanzen / Bankabgleich", "/finance"],
@@ -49,14 +47,14 @@ const groupLabels: Record<keyof SearchResponse, string> = {
   documents: "Dokumente",
 };
 
-export function CommandPalette() {
+export function CommandPalette({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: Dispatch<SetStateAction<boolean>> }) {
   const { isAdmin } = useCurrentUser();
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Entry[]>([]);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -70,12 +68,13 @@ export function CommandPalette() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [setIsOpen]);
 
   useEffect(() => {
-    if (isOpen) {
-      inputRef.current?.focus();
-    }
+    if (!isOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    inputRef.current?.focus();
+    return () => previousFocus?.focus();
   }, [isOpen]);
 
   useEffect(() => {
@@ -111,17 +110,7 @@ export function CommandPalette() {
         (!lowered || page.label.toLowerCase().includes(lowered)),
     );
     const visibleFound = trimmed.length >= 2 ? found : [];
-    const ask: Entry[] = trimmed
-      ? [
-          {
-            id: "ask-ai",
-            group: "KI",
-            label: `Die KI fragen: „${trimmed}“`,
-            href: `/assistant?q=${encodeURIComponent(trimmed)}`,
-          },
-        ]
-      : [];
-    return [...matchingPages, ...visibleFound, ...ask];
+    return [...matchingPages, ...visibleFound];
   }, [query, found, isAdmin]);
 
   function close() {
@@ -146,13 +135,30 @@ export function CommandPalette() {
       onMouseDown={close}
     >
       <div
+        ref={dialogRef}
         role="dialog"
+        aria-modal="true"
         aria-label="Befehlspalette"
         className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-2xl"
         onMouseDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+            "input:not([disabled]), button:not([disabled])",
+          ) ?? []);
+          if (focusable.length === 0) return;
+          if (event.shiftKey && document.activeElement === focusable[0]) {
+            event.preventDefault();
+            focusable[focusable.length - 1].focus();
+          } else if (!event.shiftKey && document.activeElement === focusable[focusable.length - 1]) {
+            event.preventDefault();
+            focusable[0].focus();
+          }
+        }}
       >
         <input
           ref={inputRef}
+          aria-label="Seite, Kunde oder Beleg suchen"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -170,7 +176,7 @@ export function CommandPalette() {
               choose(entries[active]);
             }
           }}
-          placeholder="Seite, Kunde, Beleg suchen oder die KI fragen…"
+          placeholder="Seite, Kunde oder Beleg suchen…"
           className="w-full border-b border-zinc-100 px-4 py-3.5 text-sm outline-none"
         />
         <ul className="max-h-[50vh] overflow-y-auto py-2">

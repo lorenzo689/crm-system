@@ -51,22 +51,20 @@ export function FinanceOverview() {
     {
       label: "Bezahlt dieses Jahr",
       value: formatMoney(summary.paidThisYearGrossCents),
-      detail:
-        summary.lowStockArticles > 0
-          ? `${summary.lowStockArticles} Artikel unter Mindestbestand`
-          : "Lagerbestand in Ordnung",
+      detail: "Brutto, bezahlte Rechnungen",
       href: "/articles",
     },
   ];
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-      <div className="grid gap-4 sm:grid-cols-2">
+    <section className="finance-overview" aria-label="Finanzüberblick">
+      <div className="finance-overview-heading"><h2>Finanzüberblick</h2><Link href="/finance">Finanzen öffnen</Link></div>
+      <div className="finance-overview-tiles">
         {tiles.map((tile) => (
           <Link
             key={tile.label}
             href={tile.href}
-            className="rounded-2xl border border-zinc-200 bg-white p-5 transition hover:shadow-md"
+            className="finance-overview-tile"
           >
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-zinc-400">
               {tile.label}
@@ -81,13 +79,10 @@ export function FinanceOverview() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+      {summary.revenueByMonth.length > 0 && <div className="finance-overview-chart">
         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-zinc-400">
           Umsatz netto (12 Monate)
         </p>
-        {summary.revenueByMonth.length === 0 ? (
-          <p className="mt-6 text-sm text-zinc-400">Noch keine Rechnungen.</p>
-        ) : (
           <div className="mt-4 flex h-32 items-end gap-1.5">
             {summary.revenueByMonth.map((entry) => (
               <div
@@ -105,8 +100,7 @@ export function FinanceOverview() {
               </div>
             ))}
           </div>
-        )}
-      </div>
+      </div>}
     </section>
   );
 }

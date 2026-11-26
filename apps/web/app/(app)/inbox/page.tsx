@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import { formatDate } from "@/lib/sales";
@@ -80,15 +79,9 @@ export default function InboxPage() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">POSTEINGANG</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-900">E-Mails</h1>
           <p className="mt-2 text-sm text-zinc-500">
-            Eingehende Mails werden alle 5 Minuten abgerufen, Kunden zugeordnet und von der KI
-            eingeordnet. Handlungsbedarf landet als Vorschlag im{" "}
-            <Link href="/assistant" className="underline">
-              KI-Postfach
-            </Link>
-            .
+            Eingehende E-Mails werden automatisch abgerufen und Kunden zugeordnet.
           </p>
         </div>
         <button
@@ -160,14 +153,6 @@ export default function InboxPage() {
                   {email.textBody}
                 </pre>
                 <div className="flex flex-wrap gap-2">
-                  <Link
-                    href={`/assistant?q=${encodeURIComponent(
-                      `Hilf mir mit der E-Mail von ${email.fromAddress} mit dem Betreff "${email.subject}" (Posteingang).`,
-                    )}`}
-                    className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600"
-                  >
-                    Mit KI bearbeiten
-                  </Link>
                   {email.status !== "DONE" && (
                     <button type="button" onClick={() => void setStatus(email, "DONE")} className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs hover:bg-zinc-50">
                       Erledigt

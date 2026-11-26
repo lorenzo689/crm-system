@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { apiFetch } from "@/lib/auth-api";
 import { useApi } from "@/lib/use-api";
+import { useDialogFocus } from "@/components/layout/use-dialog-focus";
 import {
   centsToEuroInput,
   formatDate,
@@ -66,16 +67,13 @@ export default function PurchaseOrdersPage() {
   } = useApi<Order[]>("/purchase-orders");
   const orders = useMemo(() => data ?? [], [data]);
 
-  if (isLoading) return <p className="p-8 text-sm text-zinc-400">Lädt...</p>;
+  if (isLoading) return <div className="order-list" aria-label="Bestellungen werden geladen" aria-busy="true"><div className="app-skeleton app-skeleton-title" /><div className="app-skeleton app-skeleton-panel" /></div>;
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="order-list space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">
-            EINKAUF
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Bestellungen</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">Bestellungen</h1>
           <p className="mt-2 text-sm text-zinc-500">{orders.length} Bestellungen</p>
         </div>
         <button
@@ -90,7 +88,7 @@ export default function PurchaseOrdersPage() {
 
       {loadError && <p className="text-sm text-red-600">{loadError}</p>}
 
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+      <div className="order-table overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
             <tr>
@@ -106,10 +104,9 @@ export default function PurchaseOrdersPage() {
             {orders.map((order) => (
               <tr
                 key={order.id}
-                onClick={() => setOpenId(order.id)}
-                className="cursor-pointer border-b border-zinc-100 hover:bg-zinc-50"
+                className="border-b border-zinc-100 hover:bg-zinc-50"
               >
-                <td className="px-4 py-3 font-mono text-xs font-medium">{order.number}</td>
+                <td className="px-4 py-3 font-mono text-xs font-medium"><button type="button" onClick={() => setOpenId(order.id)} className="text-left font-medium text-zinc-900 hover:underline" aria-label={`Bestellung ${order.number} öffnen`}>{order.number}</button></td>
                 <td className="px-4 py-3">{order.supplier.name}</td>
                 <td className="px-4 py-3">{formatDate(order.orderDate)}</td>
                 <td className="px-4 py-3">{formatDate(order.expectedDate)}</td>
@@ -120,7 +117,7 @@ export default function PurchaseOrdersPage() {
             {orders.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-zinc-400">
-                  Noch keine Bestellungen.
+                  <div className="app-table-empty"><strong>Noch keine Bestellungen vorhanden</strong><span>Legen Sie die erste Bestellung über die Aktion oben an.</span></div>
                 </td>
               </tr>
             )}
@@ -161,6 +158,7 @@ function OrderDetailModal({
   const [receive, setReceive] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
 
   const load = useCallback(async () => {
     try {
@@ -233,7 +231,7 @@ function OrderDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Bestellung ansehen" tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-900">
             Bestellung {order?.number ?? ""}
@@ -366,6 +364,7 @@ function CreateOrderModal({
   const [items, setItems] = useState<DraftItem[]>(() => [emptyDraft()]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
 
   useEffect(() => {
     Promise.all([
@@ -436,7 +435,7 @@ function CreateOrderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Bestellung anlegen" tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-900">Neue Bestellung</h2>
           <button type="button" onClick={onClose} aria-label="Dialog schließen" className="text-zinc-400 hover:text-zinc-600">

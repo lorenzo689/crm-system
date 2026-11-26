@@ -10,19 +10,16 @@ function BrandMark() {
   return (
     <Link
       href="/"
-      className="inline-flex items-center gap-3"
+      className="inline-flex items-center"
       aria-label="Bissinger OS Startseite"
     >
       <Image
         src="/images/images.jpg"
         alt="Bissinger Lights Logo"
-        width={42}
-        height={42}
-        className="h-10 w-10 rounded-lg object-cover"
+        width={96}
+        height={84}
+        className="h-[84px] w-24 object-contain"
       />
-      <span className="text-[1.05rem] font-semibold tracking-[-0.035em] text-[#151515]">
-        Bissinger OS
-      </span>
     </Link>
   );
 }
@@ -68,7 +65,7 @@ export default function ForgotPasswordPage() {
               </h1>
               <p className="mt-3 text-sm leading-6 text-[#686868]">
                 {"Wir senden einen Reset-Link an die hinterlegte E-Mail-Adresse."}
-                {" Lokal k\u00f6nnt ihr die Nachricht zus\u00e4tzlich in Mailpit unter"}
+                {" Lokal können Sie die Nachricht zusätzlich in Mailpit unter"}
                 {" `http://localhost:8025` pr\u00fcfen."}
               </p>
             </div>

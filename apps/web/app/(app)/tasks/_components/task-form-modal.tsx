@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useDialogFocus } from "@/components/layout/use-dialog-focus";
 
 export type TaskStatus =
   | "OPEN"
@@ -97,6 +98,7 @@ function TaskFormModalContent({
   onClose,
   onSaved,
 }: TaskFormModalProps) {
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
   const [formState, setFormState] = useState<FormState>(() =>
     task
       ? {
@@ -211,7 +213,7 @@ function TaskFormModalContent({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={task ? "Aufgabe bearbeiten" : "Neue Aufgabe anlegen"} tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-900">
             {task ? "Aufgabe bearbeiten" : "Neue Aufgabe anlegen"}

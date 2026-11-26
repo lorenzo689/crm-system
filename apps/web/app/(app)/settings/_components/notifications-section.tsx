@@ -59,7 +59,7 @@ export function NotificationsSection({ settings, onUpdate }: Props) {
           Benachrichtigungen
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Steuere, wann du benachrichtigt wirst.
+Legen Sie fest, wann Sie benachrichtigt werden.
         </p>
       </div>
 

@@ -2,23 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/auth-api";
+import { useCurrentUser } from "@/lib/use-current-user";
 import { useLogout } from "@/lib/use-logout";
 import {
   getUserInitials,
   organizationRoleLabels,
-  type CurrentUser,
 } from "@/lib/user-profile";
 
 export function ProfileMenu() {
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  const { user } = useCurrentUser();
   const [isOpen, setIsOpen] = useState(false);
   const { logout, isPending: isLoggingOut, error: logoutError } = useLogout();
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    apiFetch<CurrentUser>("/users/me").then(setUser).catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -53,7 +48,7 @@ export function ProfileMenu() {
           </span>
           <span className="block text-[0.72rem] text-zinc-400">
             {user
-              ? organizationRoleLabels[user.organizationRole]
+              ? organizationRoleLabels[user.organizationRole ?? "MEMBER"]
               : "Konto wird geladen"}
           </span>
         </span>

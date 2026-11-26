@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useDialogFocus } from "@/components/layout/use-dialog-focus";
 import {
   priorityLabels,
   statusLabels,
@@ -74,6 +75,7 @@ function ProjectFormModalContent({
   onClose,
   onSaved,
 }: ProjectFormModalProps) {
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
   const [formState, setFormState] = useState<FormState>(() =>
     project
       ? {
@@ -142,7 +144,7 @@ function ProjectFormModalContent({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={project ? "Projekt bearbeiten" : "Neues Projekt anlegen"} tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-900">
             {project ? "Projekt bearbeiten" : "Neues Projekt anlegen"}

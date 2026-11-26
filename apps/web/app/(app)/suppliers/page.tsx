@@ -75,9 +75,6 @@ export default function SuppliersPage() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">
-            EINKAUF
-          </p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Lieferanten</h1>
           <p className="mt-2 text-sm text-zinc-500">{visible.length} sichtbar</p>
         </div>
@@ -156,7 +153,7 @@ export default function SuppliersPage() {
             {visible.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-zinc-400">
-                  Keine Lieferanten gefunden.
+                  <div className="app-table-empty"><strong>{suppliers.length ? "Keine passenden Lieferanten" : "Noch keine Lieferanten vorhanden"}</strong><span>{suppliers.length ? "Passen Sie die Suche an." : "Legen Sie den ersten Lieferanten über die Aktion oben an."}</span></div>
                 </td>
               </tr>
             )}

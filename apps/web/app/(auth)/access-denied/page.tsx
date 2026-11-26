@@ -3,35 +3,19 @@ import Link from 'next/link';
 
 function BrandMark() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[linear-gradient(135deg,#2f46ff,#5d6bff)] shadow-[0_10px_25px_rgba(47,70,255,0.28)]">
-        <div className="grid h-5 w-5 grid-cols-2 gap-0.5">
-          <span className="rounded-sm bg-white" />
-          <span className="rounded-sm bg-white/80" />
-          <span className="rounded-sm bg-white/80" />
-          <span className="rounded-sm bg-white" />
-        </div>
-      </div>
-      <div>
-        <p className="text-lg font-semibold text-slate-900">Bissinger OS</p>
-        <p className="text-sm text-slate-500">Interner Zugriff</p>
-      </div>
-    </div>
+    <Image src="/images/images.jpg" alt="Bissinger Lights" width={96} height={84} className="h-[84px] w-24 object-contain" priority />
   );
 }
 
 export default function AccessDeniedPage() {
   return (
-    <main className="h-screen w-full overflow-hidden bg-[linear-gradient(180deg,#edf1f7_0%,#dfe6f2_100%)]">
-      <div className="grid h-screen w-full overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(246,248,252,0.92))] p-3 md:p-4 lg:grid-cols-[1.02fr_1fr]">
+    <main className="h-screen w-full overflow-hidden bg-[#f5f6f7]">
+      <div className="grid h-screen w-full overflow-hidden p-3 md:p-4 lg:grid-cols-[1.02fr_1fr]">
         <section className="flex h-full min-h-0 flex-col justify-between rounded-[1.5rem] px-4 py-4 sm:px-8 sm:py-5">
           <BrandMark />
 
           <div className="mx-auto flex w-full max-w-[470px] flex-1 flex-col justify-center py-6">
             <div className="space-y-4 text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#4a4cff]">
-                Zugriff
-              </p>
               <h1 className="text-4xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-[3.25rem]">
                 Zugriff verweigert
               </h1>
@@ -55,7 +39,8 @@ export default function AccessDeniedPage() {
 
               <Link
                 href="/login"
-                className="inline-flex h-13 w-full items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#2f46ff,#5748ff)] text-base font-semibold text-white shadow-[0_16px_32px_rgba(67,84,255,0.28)] transition-colors duration-200 hover:border-[#4a4cff] hover:bg-white hover:bg-none hover:text-[#4a4cff] hover:shadow-[0_16px_32px_rgba(67,84,255,0.18)]"
+                style={{ color: '#fff' }}
+                className="auth-status-action inline-flex h-12 w-full items-center justify-center rounded-lg text-sm font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9d6419]"
               >
                 Zurück zum Login
               </Link>
@@ -82,11 +67,6 @@ export default function AccessDeniedPage() {
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,12,24,0.66)_0%,rgba(8,12,24,0.52)_32%,rgba(8,12,24,0.6)_100%)]" />
 
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-8%] top-[-10%] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
-            <div className="absolute right-[-12%] top-[8%] h-96 w-96 rounded-full border border-white/8 bg-white/5" />
-            <div className="absolute bottom-[-18%] left-[18%] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
-          </div>
 
           <div className="relative z-10 max-w-xl px-8 pt-8 xl:px-10 xl:pt-10">
             <h2 className="text-4xl font-semibold leading-tight tracking-[-0.05em] xl:text-[3.35rem]">

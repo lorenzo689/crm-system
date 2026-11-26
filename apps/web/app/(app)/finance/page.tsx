@@ -47,7 +47,6 @@ export default function FinancePage() {
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div>
-        <p className="text-xs font-medium tracking-[0.28em] text-amber-600">FINANZEN</p>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Bankabgleich & Eingangsrechnungen</h1>
       </div>
       <div className="flex gap-2">

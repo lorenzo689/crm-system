@@ -17,7 +17,7 @@ type ArchiveFilter = "active" | "archived" | "all";
 type StatusFilter = "all" | Project["status"];
 
 const archiveTabs: { key: ArchiveFilter; label: string }[] = [
-  { key: "active", label: "Laufend" },
+  { key: "active", label: "Nicht archiviert" },
   { key: "archived", label: "Archiviert" },
   { key: "all", label: "Alle" },
 ];

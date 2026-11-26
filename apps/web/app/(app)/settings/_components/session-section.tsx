@@ -10,7 +10,7 @@ export function SessionSection() {
       <div>
         <h2 className="text-lg font-semibold text-zinc-900">Sitzung</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Verwalte deine aktuelle Anmeldung auf diesem Gerät.
+Verwalten Sie Ihre aktuelle Anmeldung auf diesem Gerät.
         </p>
       </div>
 

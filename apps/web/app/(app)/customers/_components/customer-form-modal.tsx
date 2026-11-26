@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/auth-api";
+import { useDialogFocus } from "@/components/layout/use-dialog-focus";
 import type { Customer } from "./customer-types";
 
 type CustomerFormModalProps = {
@@ -59,6 +60,7 @@ function CustomerFormModalContent({
   onClose,
   onSaved,
 }: CustomerFormModalProps) {
+  const { dialogRef, onDialogKeyDown } = useDialogFocus(onClose);
   const [formState, setFormState] = useState<FormState>(() =>
     customer
       ? {
@@ -150,7 +152,7 @@ function CustomerFormModalContent({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode === "create" ? "Neuen Kunden anlegen" : "Kunden bearbeiten"} tabIndex={-1} onKeyDown={onDialogKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.24em] text-amber-600">
@@ -165,6 +167,7 @@ function CustomerFormModalContent({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Dialog schließen"
             className="rounded-full p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
           >
             ×

@@ -4,7 +4,6 @@ import {
   FiCalendar,
   FiClipboard,
   FiClock,
-  FiCpu,
   FiCreditCard,
   FiDollarSign,
   FiFileMinus,
@@ -19,7 +18,6 @@ import {
   FiShoppingCart,
   FiTruck,
   FiUsers,
-  FiVideo,
 } from "react-icons/fi";
 
 export type MenuItem = {
@@ -33,7 +31,6 @@ export type MenuItem = {
 
 export const menuItems: MenuItem[] = [
   { title: "Übersicht", href: "/dashboard", icon: <FiGrid /> },
-  { title: "KI-Assistent", href: "/assistant", icon: <FiCpu /> },
   { title: "Posteingang", href: "/inbox", icon: <FiInbox />, adminOnly: true },
   { title: "Kunden", href: "/customers", icon: <FiUsers />, gap: true },
   { title: "Projekte", href: "/projects", icon: <FiFolder /> },
@@ -42,7 +39,6 @@ export const menuItems: MenuItem[] = [
   { title: "Zeiten", href: "/time", icon: <FiClock /> },
   { title: "Dokumente", href: "/documents", icon: <FiFileText /> },
   { title: "Artikel", href: "/articles", icon: <FiPackage />, gap: true },
-  { title: "Verleih", href: "/rental", icon: <FiVideo /> },
   { title: "Angebote", href: "/quotes", icon: <FiClipboard /> },
   { title: "Rechnungen", href: "/invoices", icon: <FiCreditCard /> },
   { title: "Gutschriften", href: "/credit-notes", icon: <FiFileMinus /> },
@@ -63,7 +59,6 @@ export const prefetchPaths: Record<string, string> = {
   "/suppliers": "/suppliers",
   "/purchase-orders": "/purchase-orders",
   "/inbox": "/inbox?status=NEW",
-  "/rental": "/reservations",
   "/time": "/time-entries",
   "/recurring": "/recurring-invoices",
   "/finance": "/finance/bank/transactions?status=UNMATCHED",

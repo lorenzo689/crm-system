@@ -128,22 +128,21 @@ export default function TimePage() {
     return [...map.entries()];
   }, [entries]);
 
-  if (isLoading) return <p className="p-8 text-sm text-zinc-400">Lädt...</p>;
+  if (isLoading) return <div className="time-page" aria-label="Zeiten werden geladen" aria-busy="true"><div className="app-skeleton app-skeleton-title" /><div className="app-skeleton app-skeleton-panel" /></div>;
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="time-page space-y-6 p-4 sm:p-6 lg:p-8">
       <div>
-        <p className="text-xs font-medium tracking-[0.28em] text-amber-600">ZEITERFASSUNG</p>
-        <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Arbeitszeiten</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900">Arbeitszeiten</h1>
         {summary && (
           <p className="mt-2 text-sm text-zinc-500">
             Noch nicht abgerechnet: <span className="font-medium text-zinc-800">{hours(summary.unbilledMinutes)}</span>{" "}
-            ({formatMoney(summary.unbilledValueCents)}). Den Stundensatz legst du unter Einstellungen → Firmendaten fest.
+            ({formatMoney(summary.unbilledValueCents)}). Den Stundensatz legen Sie unter Einstellungen → Firmendaten fest.
           </p>
         )}
       </div>
 
-      <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-6">
+      <form onSubmit={submit} className="time-entry-form grid gap-3 rounded-2xl border border-zinc-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-6">
         <label className="text-xs font-medium text-zinc-600">
           Datum
           <input type="date" value={workDate} onChange={(event) => setWorkDate(event.target.value)} required className={`${inputClass} mt-1`} />
@@ -237,7 +236,7 @@ export default function TimePage() {
             {entries.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-zinc-400">
-                  Noch keine Zeiten erfasst.
+                  <div className="app-table-empty"><strong>Noch keine Zeiten erfasst</strong><span>Erfassen Sie Ihre erste Arbeitszeit mit dem Formular oben.</span></div>
                 </td>
               </tr>
             )}

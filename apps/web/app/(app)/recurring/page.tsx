@@ -98,11 +98,10 @@ export default function RecurringPage() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">ABOS</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Wiederkehrende Rechnungen</h1>
           <p className="mt-2 text-sm text-zinc-500">
             Jeden Morgen um 05:00 Uhr entstehen fällige Rechnungsentwürfe. Sie werden nie automatisch
-            ausgestellt: du prüfst und versendest sie selbst.
+            ausgestellt: Sie prüfen und versenden sie selbst.
           </p>
         </div>
         <button
@@ -219,7 +218,7 @@ export default function RecurringPage() {
             {templates.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-zinc-400">
-                  Noch keine Abos.
+                  <div className="app-table-empty"><strong>Noch keine Abos vorhanden</strong><span>Mit dem Formular oben legen Sie die erste wiederkehrende Rechnung an.</span></div>
                 </td>
               </tr>
             )}

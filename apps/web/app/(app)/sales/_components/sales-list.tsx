@@ -49,23 +49,24 @@ export function SalesList({ type }: { type: SalesDocumentType }) {
   );
 
   const label = typeLabels[type];
+  const emptyTitle = type === "QUOTE" ? "Noch keine Angebote vorhanden" : type === "CREDIT_NOTE" ? "Noch keine Gutschriften vorhanden" : "Noch keine Rechnungen vorhanden";
+  const emptyHint = type === "CREDIT_NOTE" ? "Gutschriften erstellen Sie aus einer ausgestellten Rechnung." : `Erstellen Sie ${type === "QUOTE" ? "Ihr erstes Angebot" : "Ihre erste Rechnung"} über die Aktion oben.`;
 
   if (isLoading) {
-    return <p className="p-8 text-sm text-zinc-400">Lädt...</p>;
+    return (
+      <div className="sales-list" aria-label={`${label} werden geladen`} aria-busy="true">
+        <div className="app-skeleton app-skeleton-title" />
+        <div className="app-skeleton app-skeleton-row" />
+        <div className="app-skeleton app-skeleton-panel" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="sales-list space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-amber-600">
-            {type === "QUOTE"
-              ? "ANGEBOTE"
-              : type === "CREDIT_NOTE"
-                ? "GUTSCHRIFTEN"
-                : "RECHNUNGEN"}
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-zinc-900">
+          <h1 className="text-2xl font-semibold text-zinc-900">
             {type === "QUOTE"
               ? "Angebotsübersicht"
               : type === "CREDIT_NOTE"
@@ -73,10 +74,8 @@ export function SalesList({ type }: { type: SalesDocumentType }) {
                 : "Rechnungsübersicht"}
           </h1>
           <p className="mt-2 text-sm text-zinc-500">
-            {visible.length} von {documents.length} Belegen · Offen:{" "}
-            <span className="font-medium text-zinc-700">
-              {formatMoney(openSum)}
-            </span>
+            {visible.length} von {documents.length} Belegen
+            {type === "INVOICE" && <> · Offen: <span className="font-medium text-zinc-700">{formatMoney(openSum)}</span></>}
           </p>
         </div>
         {type === "CREDIT_NOTE" ? (
@@ -95,7 +94,7 @@ export function SalesList({ type }: { type: SalesDocumentType }) {
         )}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 sm:flex-row">
+      <div className="sales-filters flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 sm:flex-row">
         <input
           type="text"
           value={search}
@@ -121,7 +120,7 @@ export function SalesList({ type }: { type: SalesDocumentType }) {
 
       {loadError && <p className="text-sm text-red-600">{loadError}</p>}
 
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+      <div className="sales-table overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
             <tr>
@@ -184,7 +183,10 @@ export function SalesList({ type }: { type: SalesDocumentType }) {
             {visible.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-zinc-400">
-                  Keine Belege gefunden.
+                  <div className="app-table-empty">
+                    <strong>{documents.length ? "Keine passenden Belege" : emptyTitle}</strong>
+                    <span>{documents.length ? "Passen Sie Suche oder Statusfilter an." : emptyHint}</span>
+                  </div>
                 </td>
               </tr>
             )}
